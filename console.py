@@ -131,10 +131,13 @@ def listen():
         logging.exception('Got exception while running console command')
         reply = ''.join(traceback.format_exception(None, e, e.__traceback__))
 
-      if reply is not None:
-        client.send(reply.encode())
-        if not reply.endswith('\n'):
-          client.send(b'\n')
+      try:
+        if reply is not None:
+          client.send(reply.encode())
+          if not reply.endswith('\n'):
+            client.send(b'\n')
+      except BrokenPipeError:
+        pass
 
     try: # We don't want any exceptions here because that would kill our thread and the whole console.
       if not is_client_gone: # Calling shutdown() on a socket closed by the client would raise an exception.

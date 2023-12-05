@@ -18,14 +18,12 @@ import asyncio, discord, logging, threading
 
 import console
 from common import config
+from features import basic, counting
 
-# TODO: liczenie
 # TODO: xp
 # TODO: sugestie
 # TODO: aktualizowanie regulaminu
 # TODO: egzekwowanie regulaminu
-
-tree = discord.app_commands.CommandTree(discord.Client(intents=discord.Intents.default()))
 
 client = None
 start_event = threading.Event()
@@ -44,12 +42,6 @@ def run():
 
       global client
       client = Client(intents=intents)
-
-      client_tree = discord.app_commands.CommandTree(client)
-      for i in tree.get_commands():
-        client_tree.add_command(i)
-      client.tree = client_tree
-
       asyncio.run(client.start(config['token'])) # The Client object is useless after this.
       client = None
 
@@ -73,8 +65,13 @@ def stop():
   asyncio.run_coroutine_threadsafe(client.close(), client.loop)
 
 class Client(discord.Client):
-  async def on_ready(self):
+  async def setup_hook(self):
+    self.tree = discord.app_commands.CommandTree(self)
+    basic.setup(self, self.tree)
+    counting.setup(self, self.tree)
     await self.tree.sync()
+
+  async def on_ready(self):
     logging.info(f'Logged in as {repr(str(self.user))}')
 
 console.begin('bot')

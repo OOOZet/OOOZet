@@ -32,6 +32,7 @@ config = {
   'staff_roles': [],           # Role, których członkowie należą do administracji
   'alarm_cooldown': '5m',      # Cooldown dla komendy /alarm
   'warn_roles': [],            # Role kosmetyczne wskazujące na liczbę warnów użytkownika
+  'counting_channel': None,    # Kanał "#liczenie"
 }
 
 def load_config():
