@@ -17,8 +17,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import discord, sys
+
 import bot, common, console, database
 from common import options
+from features import basic
 
 if __name__ == '__main__':
   i = 0

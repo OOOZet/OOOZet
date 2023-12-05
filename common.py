@@ -28,6 +28,10 @@ config = {
   'console_port': 2341,
   'console_hello': 'OOOZet',   # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
   'console_timeout': '1m',     # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
+
+  'staff_roles': [],           # Role, których członkowie należą do administracji
+  'alarm_cooldown': '5m',      # Cooldown dla komendy /alarm
+  'warn_roles': [],            # Role kosmetyczne wskazujące na liczbę warnów użytkownika
 }
 
 def load_config():

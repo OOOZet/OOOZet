@@ -25,6 +25,8 @@ from common import config
 # TODO: aktualizowanie regulaminu
 # TODO: egzekwowanie regulaminu
 
+tree = discord.app_commands.CommandTree(discord.Client(intents=discord.Intents.default()))
+
 client = None
 start_event = threading.Event()
 stop_event = threading.Event()
@@ -38,9 +40,16 @@ def run():
 
       intents = discord.Intents.default()
       intents.message_content = True
+      intents.members = True
 
       global client
       client = Client(intents=intents)
+
+      client_tree = discord.app_commands.CommandTree(client)
+      for i in tree.get_commands():
+        client_tree.add_command(i)
+      client.tree = client_tree
+
       asyncio.run(client.start(config['token'])) # The Client object is useless after this.
       client = None
 
@@ -65,6 +74,7 @@ def stop():
 
 class Client(discord.Client):
   async def on_ready(self):
+    await self.tree.sync()
     logging.info(f'Logged in as {repr(str(self.user))}')
 
 console.begin('bot')

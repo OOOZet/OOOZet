@@ -48,8 +48,8 @@ def load():
       with open(config['database'], 'r') as file:
         loaded = json.load(file, object_hook=object_hook)
 
+      global data, should_save
       data |= loaded
-      global should_save
       should_save = False
     except FileNotFoundError:
       pass
@@ -57,6 +57,9 @@ def load():
 def save():
   logging.info('Saving database')
   with lock:
+    if os.path.exists(config['database']):
+      os.replace(config['database'], config['database'] + '.old')
+
     class Encoder(json.JSONEncoder):
       def default(self, value):
         if isinstance(value, set):
@@ -65,10 +68,8 @@ def save():
             result[item] = None
           return result
         return json.JSONEncoder.default(self, value)
-
-    with open(config['database'], 'r+' if os.path.isfile(config['history']) else 'x') as file:
+    with open(config['database'], 'x') as file:
       json.dump(data, file, cls=Encoder)
-      file.truncate()
 
     global should_save
     should_save = False
