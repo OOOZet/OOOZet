@@ -18,7 +18,7 @@ import asyncio, discord, random
 from datetime import datetime
 
 import console, database
-from common import config
+from common import config, format_datetime, is_staff, mention_datetime, debacktick, select_view
 
 bot = None
 
@@ -39,12 +39,12 @@ def setup(_bot):
 
   @bot.tree.command(description='Warnuje użytkownika')
   async def warn(interaction, user: discord.Member, reason: str):
-    if not any(interaction.user.get_role(i) is not None for i in config['staff_roles']):
-      await interaction.response.send_message('Nie masz uprawnień do warnowania, tylko administracja może to robić. :rage:', ephemeral=True)
+    if not is_staff(interaction.user):
+      await interaction.response.send_message('Nie masz uprawnień do warnowania, tylko administracja może to robić. 😡', ephemeral=True)
       return
 
     warn = {
-      'time': datetime.now().astimezone().isoformat(),
+      'time': datetime.now().astimezone(),
       'reason': reason,
     }
     database.data.setdefault('warns', {}).setdefault(user.id, []).append(warn)
@@ -53,48 +53,36 @@ def setup(_bot):
 
     await update_roles_for(user)
 
-    await interaction.response.send_message(f'{user.mention} właśnie dostał swojego {count}-ego warna za `{reason.replace("`", "")}`! :unamused:')
+    await interaction.response.send_message(f'{user.mention} właśnie dostał swojego {count}-ego warna za `{debacktick(reason)}`! 😒')
 
   @bot.tree.context_menu(name='Odbierz warna')
   async def unwarn(interaction, user: discord.Member):
-    if not any(interaction.user.get_role(i) is not None for i in config['staff_roles']):
-      await interaction.response.send_message('Nie masz uprawnień do odbierania warnów, tylko administracja może to robić. :rage:', ephemeral=True)
+    if not is_staff(interaction.user):
+      await interaction.response.send_message('Nie masz uprawnień do odbierania warnów, tylko administracja może to robić. 😡', ephemeral=True)
       return
 
     warns = database.data.get('warns', {}).get(user.id, [])
 
     if not warns:
-      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! :innocent:', ephemeral=True)
+      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
       return
 
-    async def callback(interaction2):
-      warn = next(filter(lambda x: id(x) == int(choice.values[0]), warns))
+    async def callback(interaction2, choice):
+      warn = find(int(choice), warns, proj=lambda x: id(x))
       warns.remove(warn)
       database.should_save = True
 
       await update_roles_for(user)
 
-      timestamp = int(datetime.fromisoformat(warn['time']).timestamp())
-      reason = warn['reason'].replace('`', '')
-      await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia <t:{timestamp}> użytkownikowi {user.mention}! :partying_face:', view=None)
+      reason = debacktick(warn['reason'])
+      time = mention_datetime(warn["time"])
+      await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia {time} użytkownikowi {user.mention}! 🥳', view=None)
 
       await interaction2.response.defer()
 
-    choice = discord.ui.Select()
-    choice.callback = callback
-    view = discord.ui.View()
-    view.add_item(choice)
-    async def interaction_check(interaction2):
-      return interaction2.user == interaction.user
-    view.interaction_check = interaction_check
-
+    select, view = select_view(callback, interaction.user)
     for warn in warns:
-      time = datetime.fromisoformat(warn['time'])
-      choice.add_option(
-        label=warn['reason'],
-        value=id(warn),
-        description=f'{time.day} {time:%B} {time:%Y} {time:%H}:{time:%M}',
-      )
+      select.add_option(label=warn['reason'], value=id(warn), description=format_datetime(warn["time"]))
 
     await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {user.mention}?', view=view)
 
@@ -103,19 +91,19 @@ def setup(_bot):
     warns = database.data.get('warns', {}).get(user.id, [])
     if warns:
       result = random.choice([
-        f'{user.mention} ma już na swoim koncie parę złych uczynków… :pensive:',
-        f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… :confused:',
-        f'Na {user.mention} czeka już tylko czyściec… :weary:',
+        f'{user.mention} ma już na swoim koncie parę złych uczynków… 😔',
+        f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕',
+        f'Na {user.mention} czeka już tylko czyściec… 😩',
       ])
 
       for warn in warns:
-        timestamp = int(datetime.fromisoformat(warn['time']).timestamp())
-        reason = warn['reason'].replace('`', '')
-        result += f'\n- `{reason}` w dniu <t:{timestamp}>'
+        reason = debacktick(warn['reason'])
+        time = mention_datetime(warn["time"])
+        result += f'\n- `{reason}` w dniu {time}'
 
       await interaction.response.send_message(result, ephemeral=True)
     else:
-      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! :innocent:', ephemeral=True)
+      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
 
 console.begin('warns')
 console.register('update_roles', None, 'updates warn roles for all users', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())

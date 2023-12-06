@@ -18,9 +18,9 @@ import asyncio, discord, discord.ext.commands, logging, threading
 
 import console
 from common import config
-from features import counting, misc, warns, xp
+from features import counting, misc, sugestie, warns, xp
 
-# TODO: sugestie
+# TODO: sprawdz emoji i f-stringi
 # TODO: aktualizowanie regulaminu
 # TODO: egzekwowanie regulaminu
 
@@ -67,6 +67,7 @@ class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
     counting.setup(self)
     misc.setup(self)
+    sugestie.setup(self)
     warns.setup(self)
     xp.setup(self)
     await self.tree.sync()

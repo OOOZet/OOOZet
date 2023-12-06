@@ -32,10 +32,11 @@ def level_to_xp(level):
 async def update_roles_for(user):
   level = xp_to_level(database.data.get('xp', {}).get(user.id, 0))
   for threshold, role in config['xp_roles']:
+    role = user.guild.get_role(role)
     if level >= threshold:
-      await user.add_roles(user.guild.get_role(role))
+      await user.add_roles(role)
     else:
-      await user.remove_roles(user.guild.get_role(role))
+      await user.remove_roles(role)
 
 async def update_roles():
   for user in bot.get_all_members():
@@ -54,12 +55,11 @@ def setup(_bot):
     with database.lock:
       database.data.setdefault('xp_last_gain', {})
       if user.id in database.data['xp_last_gain']:
-        last = datetime.fromisoformat(database.data['xp_last_gain'][user.id])
         now = datetime.now().astimezone()
         cooldown = parse_duration(config['xp_cooldown'])
-        if (now - last).total_seconds() < cooldown:
+        if (now - database.data['xp_last_gain'][user.id]).total_seconds() < cooldown:
           return
-        database.data['xp_last_gain'][user.id] = now.isoformat()
+        database.data['xp_last_gain'][user.id] = now
 
     database.data.setdefault('xp', {}).setdefault(user.id, 0)
     old_level = xp_to_level(database.data['xp'][user.id])
@@ -87,14 +87,14 @@ def setup(_bot):
     level = xp_to_level(xp)
     left = level_to_xp(level + 1) - xp
     if user == interaction.user:
-      await interaction.response.send_message(f'Masz {xp} XP i tym samym poziom {level}. Do następnego brakuje ci jeszcze {left} XP. :chart_with_upwards_trend:', ephemeral=True)
+      await interaction.response.send_message(f'Masz {xp} XP i tym samym poziom {level}. Do następnego brakuje ci jeszcze {left} XP. 📈', ephemeral=True)
     else:
-      await interaction.response.send_message(f'{user.mention} ma {xp} XP i tym samym poziom {level}. Do następnego brakuje mu jeszcze {left} XP. :chart_with_upwards_trend:', ephemeral=True)
+      await interaction.response.send_message(f'{user.mention} ma {xp} XP i tym samym poziom {level}. Do następnego brakuje mu jeszcze {left} XP. 📈', ephemeral=True)
 
   @xp.command(description='Wyświetla 10 użytkowników z najwyższym XP')
   async def leaderboard(interaction):
     ranking = sorted(database.data.get('xp', {}).items(), key=lambda x: x[1], reverse=True)[:10]
-    result = f'Ranking 10 użytkowników z najwyższym XP: :trophy:'
+    result = f'Ranking 10 użytkowników z najwyższym XP: 🏆'
     for i, data in enumerate(ranking):
       user, xp = data
       level = xp_to_level(xp)

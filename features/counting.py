@@ -28,13 +28,11 @@ def setup(bot):
       return
 
     if 'counting_clean_until' not in database.data:
-      database.data['counting_clean_until'] = datetime.now().astimezone().isoformat()
+      database.data['counting_clean_until'] = datetime.now().astimezone()
       database.should_save = True
-      return
 
     async with lock:
-      clean_until = datetime.fromisoformat(database.data['counting_clean_until'])
-      async for msg in bot.get_channel(config['counting_channel']).history(limit=None, after=clean_until):
+      async for msg in bot.get_channel(config['counting_channel']).history(limit=None, after=database.data['counting_clean_until']):
         try:
           num = int(msg.content)
         except ValueError:
@@ -44,14 +42,16 @@ def setup(bot):
             if 'counting_num' not in database.data:
               logging.info(f'The initial counting number has been called at {num}')
             database.data['counting_num'] = num + 1
-            database.data['counting_clean_until'] = msg.created_at.isoformat()
+            database.data['counting_clean_until'] = msg.created_at
             database.should_save = True
           else:
             await msg.delete()
 
   @bot.listen()
   async def on_ready():
+    logging.info('Cleaning the counting channel')
     await clean()
+    logging.info('Counting is ready')
 
   @bot.listen()
   async def on_message(msg):

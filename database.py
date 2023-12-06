@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import json, logging, os, threading
+from datetime import datetime
 
 import console
 from common import config, parse_duration
@@ -28,23 +29,17 @@ def load():
   with lock:
     try:
       def object_hook(object):
-        if '__set__' in object:
-          result = set()
-          for item in object:
-            if item != '__set__':
-              try:
-                result.add(int(item))
-              except ValueError:
-                result.add(item)
-          return result
+        if set(object) == {'__set__'}:
+          return set(object['__set__'])
+        elif set(object) == {'__datetime__'}:
+          return datetime.fromisoformat(object['__datetime__'])
         else:
-          result = {}
-          for key, value in object.items():
+          def maybe_int(x):
             try:
-              result[int(key)] = value
+              return int(x)
             except ValueError:
-              result[key] = value
-          return result
+              return x
+          return {maybe_int(k): v for k, v in object.items()}
       with open(config['database'], 'r') as file:
         loaded = json.load(file, object_hook=object_hook)
 
@@ -63,11 +58,11 @@ def save():
     class Encoder(json.JSONEncoder):
       def default(self, value):
         if isinstance(value, set):
-          result = {'__set__': True}
-          for item in value:
-            result[item] = None
-          return result
-        return json.JSONEncoder.default(self, value)
+          return {'__set__': list(value)}
+        elif isinstance(value, datetime):
+          return {'__datetime__': value.isoformat()}
+        else:
+          return super().default(value)
     with open(config['database'], 'x') as file:
       json.dump(data, file, cls=Encoder)
 

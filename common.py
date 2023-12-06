@@ -14,32 +14,38 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import json, logging
+import discord, json, logging
 
 options = {
   'config': 'config.json'
 }
 
 config = {
-  'token': None,               # Token twojego bota
-  'database': 'database.json', # Ścieżka do pliku z baza danych
-  'autosave': '1m',            # Regularny odstęp czasu, w którym baza danych będzie automatycznie zapisywana, gdy jest to potrzebne
-  'console_host': 'localhost', # Te dwa są w zasadzie oczywiste
+  'token': None,                  # Token twojego bota
+  'database': 'database.json',    # Ścieżka do pliku z baza danych
+  'autosave': '1m',               # Regularny odstęp czasu, w którym baza danych będzie automatycznie zapisywana, gdy jest to potrzebne
+  'console_host': 'localhost',    # Te dwa są w zasadzie oczywiste
   'console_port': 2341,
-  'console_hello': 'OOOZet',   # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
-  'console_timeout': '1m',     # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
+  'console_hello': 'OOOZet',      # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
+  'console_timeout': '1m',        # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
 
-  'staff_roles': [],           # Role, których członkowie należą do administracji
-  'alarm_cooldown': '5m',      # Cooldown dla komendy /alarm
-  'warn_roles': [],            # Role kosmetyczne wskazujące na liczbę warnów użytkownika
-  'counting_channel': None,    # Kanał "#liczenie"
-  'xp_cooldown': '1m',         # Odstęp czasu, po którym można ponownie dostać XP
-  'xp_min_gain': 15,           # Minimalna ilość XP, którą można dostać za jedną wiadomość
-  'xp_max_gain': 40,           # Maksymalna ilość XP, którą można dostać za jedną wiadomość
-  'xp_ignored_channels': [],   # Kanały, które nie są liczone do XP
-  'xp_ignored_categories': [], # Kategorie kanałów, które nie są liczone do XP
-  'xp_roles': [],              # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
-  'xp_channel': None,          # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
+  'guild_name': 'OOOZ',           # Nazwa serwera, na którym rezyduje bot
+  'staff_roles': [],              # Role, których członkowie należą do administracji
+  'alarm_cooldown': '5m',         # Cooldown dla komendy /alarm
+  'warn_roles': [],               # Role kosmetyczne wskazujące na liczbę warnów użytkownika
+  'counting_channel': None,       # Kanał "#liczenie"
+  'xp_cooldown': '1m',            # Odstęp czasu, po którym można ponownie dostać XP
+  'xp_min_gain': 15,              # Minimalna ilość XP, którą można dostać za jedną wiadomość
+  'xp_max_gain': 40,              # Maksymalna ilość XP, którą można dostać za jedną wiadomość
+  'xp_ignored_channels': [],      # Kanały, które nie są liczone do XP
+  'xp_ignored_categories': [],    # Kategorie kanałów, które nie są liczone do XP
+  'xp_roles': [],                 # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
+  'xp_channel': None,             # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
+  'sugestie_channel': None,       # Kanal "#sugestie"
+  'sugestie_vote_role': None,     # Rola, która może głosować nad sugestiami
+  'sugestie_ping_role': None,     # Rola, która jest pingowana, gdy pojawia się nowa sugestia
+  'sugestie_vote_length': '24h',  # Czas na głosowanie nad sugestią
+  'sugestie_deciding_lead': None, # Przewaga, po której jedna z opcji wygrywa
 }
 
 def load_config():
@@ -79,3 +85,36 @@ def parse_duration(string):
     else:
       raise Exception(f'Invalid duration: {repr(string)}')
   return result
+
+def format_datetime(datetime):
+  return datetime.strftime(f'%-d %B %Y %H:%M') # %-d is not portable.
+
+def mention_datetime(datetime):
+  return f'<t:{int(datetime.timestamp())}>'
+
+def is_staff(user):
+  return any(user.get_role(i) is not None for i in config['staff_roles'])
+
+def mention_message(client, channel, msg):
+  return client.get_partial_messageable(channel).get_partial_message(msg).jump_url
+
+def debacktick(string):
+  return string.replace('`', '')
+
+def select_view(callback, owner):
+  select = discord.ui.Select()
+  async def our_callback(interaction):
+    await callback(interaction, select.values[0])
+  select.callback = our_callback
+
+  view = discord.ui.View()
+  view.add_item(select)
+  if owner is not None:
+    async def interaction_check(interaction):
+      return interaction.user == owner
+    view.interaction_check = interaction_check
+
+  return select, view
+
+def find(value, iterable, *, proj=lambda x: x):
+  return next(filter(lambda x: proj(x) == value, iterable))

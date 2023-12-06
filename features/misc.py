@@ -31,7 +31,7 @@ def setup(bot):
 
   @bot.tree.command(description='Dziękuje istotnym twórcom bota')
   async def credits(interaction):
-    await interaction.response.send_message('OOOZet powstał dzięki wspólnym staraniom <@671790729676324867>, <@386516541790748673>, <@536253933778370580> i innych. :slight_smile:', ephemeral=True)
+    await interaction.response.send_message('OOOZet powstał dzięki wspólnym staraniom <@671790729676324867>, <@386516541790748673>, <@536253933778370580> i innych. 🙂', ephemeral=True)
 
   @bot.tree.command(description='Sprawdza ping bota')
   async def ping(interaction):
@@ -42,31 +42,34 @@ def setup(bot):
     staff = {i for role in config['staff_roles'] for i in interaction.guild.get_role(role).members}
 
     if not staff:
-      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… :face_with_raised_eyebrow:')
+      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨')
       return
 
-    now = datetime.now().astimezone()
-
     if 'alarm_last' in database.data:
-      last = datetime.fromisoformat(database.data['alarm_last'])
+      now = datetime.now().astimezone()
       cooldown = parse_duration(config['alarm_cooldown'])
-      if (now - last).total_seconds() < cooldown:
-        await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich {cooldown} sekund. :stopwatch:', ephemeral=True)
+      if (now - database.data['alarm_last']).total_seconds() < cooldown:
+        await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich {cooldown} sekund. ⏱️', ephemeral=True)
         return
+      database.data['alarm_last'] = now
+      database.should_save = True
 
-    database.data['alarm_last'] = now.isoformat()
-    database.should_save = True
+    emoji = random.choice(['😟', '😖', '😱', '😮', '😵', '😵‍💫', '🥴'])
 
-    emoji = random.choice([':worried:', ':confounded:', ':scream:', ':open_mouth:', ':dizzy_face:', ':face_with_spiral_eyes:', ':woozy_face:'])
-
-    await interaction.response.send_message(f'{" ".join(i.mention for i in staff)} Potrzebna natychmiastowa interwencja!!! {emoji}')
+    mentions = ' '.join(i.mention for i in staff)
+    await interaction.response.send_message(f'{mentions} Potrzebna natychmiastowa interwencja!!! {emoji}')
 
     for user in staff:
-      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na OOOZ!!! {emoji}')
+      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {config["guild_name"]}!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
 
   @bot.tree.context_menu(name='Odśwież role')
   async def update_roles(interaction, user: discord.User):
     await warns.update_roles_for(user)
     await xp.update_roles_for(user)
-    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {user.mention}. :ok_hand:', ephemeral=True)
+    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {user.mention}. 👌', ephemeral=True)
+
+  @bot.listen()
+  async def on_member_join(user):
+    await warns.update_roles_for(user)
+    await xp.update_roles_for(user)
