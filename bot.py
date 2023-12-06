@@ -14,13 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, threading
+import asyncio, discord, discord.ext.commands, logging, threading
 
 import console
 from common import config
-from features import basic, counting
+from features import counting, misc, warns, xp
 
-# TODO: xp
 # TODO: sugestie
 # TODO: aktualizowanie regulaminu
 # TODO: egzekwowanie regulaminu
@@ -41,7 +40,7 @@ def run():
       intents.members = True
 
       global client
-      client = Client(intents=intents)
+      client = Client('This parameter is irrelevant for us but we still have to put something here.', intents=intents)
       asyncio.run(client.start(config['token'])) # The Client object is useless after this.
       client = None
 
@@ -64,11 +63,12 @@ def stop():
   stop_event.set()
   asyncio.run_coroutine_threadsafe(client.close(), client.loop)
 
-class Client(discord.Client):
+class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
-    self.tree = discord.app_commands.CommandTree(self)
-    basic.setup(self, self.tree)
-    counting.setup(self, self.tree)
+    counting.setup(self)
+    misc.setup(self)
+    warns.setup(self)
+    xp.setup(self)
     await self.tree.sync()
 
   async def on_ready(self):

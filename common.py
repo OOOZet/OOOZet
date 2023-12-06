@@ -33,6 +33,13 @@ config = {
   'alarm_cooldown': '5m',      # Cooldown dla komendy /alarm
   'warn_roles': [],            # Role kosmetyczne wskazujące na liczbę warnów użytkownika
   'counting_channel': None,    # Kanał "#liczenie"
+  'xp_cooldown': '1m',         # Odstęp czasu, po którym można ponownie dostać XP
+  'xp_min_gain': 15,           # Minimalna ilość XP, którą można dostać za jedną wiadomość
+  'xp_max_gain': 40,           # Maksymalna ilość XP, którą można dostać za jedną wiadomość
+  'xp_ignored_channels': [],   # Kanały, które nie są liczone do XP
+  'xp_ignored_categories': [], # Kategorie kanałów, które nie są liczone do XP
+  'xp_roles': [],              # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
+  'xp_channel': None,          # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
 }
 
 def load_config():

@@ -14,64 +14,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, pprint, random
+import asyncio, discord, random
 from datetime import datetime
 
-import database
-from common import config, parse_duration
+import console, database
+from common import config
 
-def setup(client, tree):
-  @tree.command(name='config', description='Wyświetla konfigurację bota')
-  async def _config(interaction):
-    result = config.copy()
-    del result['token']
-    result = pprint.pformat(result, sort_dicts=False)
-    await interaction.response.send_message(f'Moja wewnętrzna konfiguracja wygląda następująco:```json\n{result}```', ephemeral=True)
+bot = None
 
-  @tree.command(description='Dziękuje istotnym twórcom bota')
-  async def credits(interaction):
-    await interaction.response.send_message('OOOZet powstał dzięki wspólnym staraniom <@671790729676324867>, <@386516541790748673>, <@536253933778370580> i innych. :slight_smile:', ephemeral=True)
+async def update_roles_for(user):
+  roles = [user.guild.get_role(i) for i in config['warn_roles']]
+  await user.remove_roles(*roles)
+  count = len(database.data.get('warns', {}).get(user.id, []))
+  if count > 0 and roles:
+    await user.add_roles(roles[min(count, len(roles)) - 1])
 
-  @tree.command(description='Sprawdza ping bota')
-  async def ping(interaction):
-    await interaction.response.send_message(f'Pong! `{1000 * client.latency:.0f}ms`', ephemeral=True)
+async def update_roles():
+  for user in bot.get_all_members():
+    await update_roles_for(user)
 
-  @tree.command(description='Wzywa pomoc administracji')
-  async def alarm(interaction):
-    staff = {i for role in config['staff_roles'] for i in interaction.guild.get_role(role).members}
+def setup(_bot):
+  global bot
+  bot = _bot
 
-    if not staff:
-      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… :face_with_raised_eyebrow:')
-      return
-
-    now = datetime.now().astimezone()
-
-    if 'alarm_last' in database.data:
-      last = datetime.fromisoformat(database.data['alarm_last'])
-      cooldown = parse_duration(config['alarm_cooldown'])
-      if (now - last).total_seconds() < cooldown:
-        await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich {cooldown} sekund. :stopwatch:', ephemeral=True)
-        return
-
-    database.data['alarm_last'] = now.isoformat()
-    database.should_save = True
-
-    emoji = random.choice([':worried:', ':confounded:', ':scream:', ':open_mouth:', ':dizzy_face:', ':face_with_spiral_eyes:', ':woozy_face:'])
-
-    await interaction.response.send_message(f'{" ".join(i.mention for i in staff)} Potrzebna natychmiastowa interwencja!!! {emoji}')
-
-    for user in staff:
-      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na OOOZ!!! {emoji}')
-      await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
-
-  async def update_warn_role_for(user):
-    roles = [user.guild.get_role(i) for i in config['warn_roles']]
-    await user.remove_roles(*roles)
-    count = len(database.data.get('warns', {}).get(user.id, []))
-    if count > 0 and roles:
-      await user.add_roles(roles[min(count, len(roles)) - 1])
-
-  @tree.command(description='Warnuje użytkownika')
+  @bot.tree.command(description='Warnuje użytkownika')
   async def warn(interaction, user: discord.Member, reason: str):
     if not any(interaction.user.get_role(i) is not None for i in config['staff_roles']):
       await interaction.response.send_message('Nie masz uprawnień do warnowania, tylko administracja może to robić. :rage:', ephemeral=True)
@@ -85,11 +51,11 @@ def setup(client, tree):
     database.should_save = True
     count = len(database.data['warns'][user.id])
 
-    await update_warn_role_for(user)
+    await update_roles_for(user)
 
     await interaction.response.send_message(f'{user.mention} właśnie dostał swojego {count}-ego warna za `{reason.replace("`", "")}`! :unamused:')
 
-  @tree.context_menu(name='Odbierz warna')
+  @bot.tree.context_menu(name='Odbierz warna')
   async def unwarn(interaction, user: discord.Member):
     if not any(interaction.user.get_role(i) is not None for i in config['staff_roles']):
       await interaction.response.send_message('Nie masz uprawnień do odbierania warnów, tylko administracja może to robić. :rage:', ephemeral=True)
@@ -106,7 +72,7 @@ def setup(client, tree):
       warns.remove(warn)
       database.should_save = True
 
-      await update_warn_role_for(user)
+      await update_roles_for(user)
 
       timestamp = int(datetime.fromisoformat(warn['time']).timestamp())
       reason = warn['reason'].replace('`', '')
@@ -132,7 +98,7 @@ def setup(client, tree):
 
     await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {user.mention}?', view=view)
 
-  @tree.context_menu(name='Pokaż warny')
+  @bot.tree.context_menu(name='Pokaż warny')
   async def warns(interaction, user: discord.Member):
     warns = database.data.get('warns', {}).get(user.id, [])
     if warns:
@@ -150,3 +116,7 @@ def setup(client, tree):
       await interaction.response.send_message(result, ephemeral=True)
     else:
       await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! :innocent:', ephemeral=True)
+
+console.begin('warns')
+console.register('update_roles', None, 'updates warn roles for all users', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())
+console.end()

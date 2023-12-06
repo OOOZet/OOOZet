@@ -20,7 +20,7 @@ from datetime import datetime
 import console, database
 from common import config
 
-def setup(client, tree):
+def setup(bot):
   lock = asyncio.Lock()
 
   async def clean():
@@ -34,7 +34,7 @@ def setup(client, tree):
 
     async with lock:
       clean_until = datetime.fromisoformat(database.data['counting_clean_until'])
-      async for msg in client.get_channel(config['counting_channel']).history(limit=None, after=clean_until):
+      async for msg in bot.get_channel(config['counting_channel']).history(limit=None, after=clean_until):
         try:
           num = int(msg.content)
         except ValueError:
@@ -49,11 +49,11 @@ def setup(client, tree):
           else:
             await msg.delete()
 
-  @client.event
+  @bot.listen()
   async def on_ready():
     await clean()
 
-  @client.event
+  @bot.listen()
   async def on_message(msg):
     if config['counting_channel'] is not None and msg.channel.id == config['counting_channel']:
       await clean() # on_message can come before on_ready.
