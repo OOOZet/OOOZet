@@ -20,7 +20,24 @@ import console
 from common import config
 from features import counting, misc, sugestie, warns, xp
 
-# TODO: sprawdz emoji i f-stringi
+class Client(discord.ext.commands.Bot):
+  async def setup_hook(self):
+    counting.setup(self)
+    misc.setup(self)
+    sugestie.setup(self)
+    warns.setup(self)
+    xp.setup(self)
+    await self.tree.sync()
+
+  def __init__(self):
+    intents = discord.Intents.default()
+    intents.message_content = True
+    intents.members = True
+    super().__init__('This parameter is irrelevant for us but we still have to put something here.', intents=intents)
+
+  async def on_ready(self):
+    logging.info(f'Logged in as {repr(str(self.user))}')
+
 # TODO: aktualizowanie regulaminu
 # TODO: egzekwowanie regulaminu
 
@@ -35,12 +52,8 @@ def run():
       start_event.wait()
       stop_event.clear()
 
-      intents = discord.Intents.default()
-      intents.message_content = True
-      intents.members = True
-
       global client
-      client = Client('This parameter is irrelevant for us but we still have to put something here.', intents=intents)
+      client = Client()
       asyncio.run(client.start(config['token'])) # The Client object is useless after this.
       client = None
 
@@ -62,18 +75,6 @@ def stop():
   logging.info('Stopping bot')
   stop_event.set()
   asyncio.run_coroutine_threadsafe(client.close(), client.loop)
-
-class Client(discord.ext.commands.Bot):
-  async def setup_hook(self):
-    counting.setup(self)
-    misc.setup(self)
-    sugestie.setup(self)
-    warns.setup(self)
-    xp.setup(self)
-    await self.tree.sync()
-
-  async def on_ready(self):
-    logging.info(f'Logged in as {repr(str(self.user))}')
 
 console.begin('bot')
 console.register('start', None, 'starts the bot', start)

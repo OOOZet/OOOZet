@@ -53,13 +53,12 @@ def setup(_bot):
       return
 
     with database.lock:
-      database.data.setdefault('xp_last_gain', {})
-      if user.id in database.data['xp_last_gain']:
-        now = datetime.now().astimezone()
+      now = datetime.now().astimezone()
+      if user.id in database.data.setdefault('xp_last_gain', {}):
         cooldown = parse_duration(config['xp_cooldown'])
         if (now - database.data['xp_last_gain'][user.id]).total_seconds() < cooldown:
           return
-        database.data['xp_last_gain'][user.id] = now
+      database.data['xp_last_gain'][user.id] = now
 
     database.data.setdefault('xp', {}).setdefault(user.id, 0)
     old_level = xp_to_level(database.data['xp'][user.id])
@@ -71,12 +70,12 @@ def setup(_bot):
       await update_roles_for(user)
       if config['xp_channel'] is not None:
         announcement = random.choice([
-          f'{user.mention} nie ma życia i dzięki temu jest już na poziomie {level}!',
-          f'{user.mention} właśnie wszedł na wyższy poziom {level}!',
-          f'{user.mention} zdobył kolejny poziom {level}. Brawo!',
-          f'{user.mention} zdobył kolejny poziom {level}. Moje kondolencje.',
+          f'{user.mention} nie ma życia i dzięki temu jest już na poziomie {level}! 🥳',
+          f'{user.mention} właśnie wszedł na wyższy poziom {level}! 🥳',
+          f'{user.mention} zdobył kolejny poziom {level}. Brawo! 🥳',
+          f'{user.mention} zdobył kolejny poziom {level}. Moje kondolencje. 🥳',
         ])
-        await client.get_channel(config['xp_channel']).send(announcement)
+        await bot.get_channel(config['xp_channel']).send(announcement)
 
   xp = discord.app_commands.Group(name='xp', description='Komendy do XP')
   bot.tree.add_command(xp)

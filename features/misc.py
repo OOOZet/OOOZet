@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, pprint, random
+import discord, logging, pprint, random, subprocess
 from datetime import datetime
 
 import database
@@ -22,6 +22,30 @@ from common import config, parse_duration
 from features import warns, xp
 
 def setup(bot):
+  @bot.tree.context_menu(name='Odśwież role')
+  async def update_roles(interaction, user: discord.User):
+    await warns.update_roles_for(user)
+    await xp.update_roles_for(user)
+    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {user.mention}. 👌', ephemeral=True)
+
+  @bot.listen()
+  async def on_member_join(user):
+    logging.info(f'User {user.id} joined the guild')
+    await warns.update_roles_for(user)
+    await xp.update_roles_for(user)
+
+  @bot.listen()
+  async def on_member_remove(user):
+    logging.info(f'User {user.id} left the guild')
+    if user.guild.system_channel_flags.join_notifications:
+      announcement = random.choice([
+        f'Niestety nie ma już {user.mention} z nami… 🕯️',
+        f'Chwila ciszy dla {user.mention}… 🕯️',
+        f'{user.mention} już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
+        f'{user.mention} wyszedł z serwera… 🕯️',
+      ])
+      await user.guild.system_channel.send(announcement)
+
   @bot.tree.command(name='config', description='Wyświetla konfigurację bota')
   async def _config(interaction):
     result = config.copy()
@@ -63,13 +87,16 @@ def setup(bot):
       await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {config["guild_name"]}!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
 
-  @bot.tree.context_menu(name='Odśwież role')
-  async def update_roles(interaction, user: discord.User):
-    await warns.update_roles_for(user)
-    await xp.update_roles_for(user)
-    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {user.mention}. 👌', ephemeral=True)
+  setup_time = datetime.now().astimezone()
 
-  @bot.listen()
-  async def on_member_join(user):
-    await warns.update_roles_for(user)
-    await xp.update_roles_for(user)
+  @bot.tree.command(description='Sprawdza uptime serwera i bota')
+  async def uptime(interaction):
+    server_uptime = subprocess.run(['uptime', '-p'], capture_output=True, text=True).stdout.strip()
+    bot_uptime = interaction.created_at - setup_time
+    await interaction.response.send_message(
+      f'''
+Uptime serwera to: `{server_uptime}` 🖥️
+Uptime bota to: `{bot_uptime}` 🤖
+      ''',
+      ephemeral=True,
+    )

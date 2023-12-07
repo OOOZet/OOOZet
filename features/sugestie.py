@@ -37,7 +37,7 @@ def setup(bot):
         database.should_save = True
 
         if sugestia['did_pass']:
-          logging.info(f'Sugestia {sugestia["id"]} passed')
+          logging.info(f'Sugestia {sugestia["id"]} has passed')
         else:
           logging.info(f'Sugestia {sugestia["id"]} did not pass')
 
@@ -49,7 +49,9 @@ def setup(bot):
         user = interaction.user.id
         choice = interaction.data['custom_id']
 
-        if config['sugestie_vote_role'] is not None and interaction.user.get_role(config['sugestie_vote_role']) is None:
+        if interaction.user.bot:
+          await interaction.response.send_message('Boty nie mogą głosować nad sugestiami… 🤨', ephemeral=True)
+        elif config['sugestie_vote_role'] is not None and interaction.user.get_role(config['sugestie_vote_role']) is None:
           await interaction.response.send_message(f'Nie masz jeszcze roli <@&{config["sugestie_vote_role"]}> i nie możesz głosować nad sugestiami. 😢', ephemeral=True)
         elif interaction.created_at >= sugestia['vote_end']:
           await interaction.response.send_message('Głosowanie nad tą sugestią już się skończyło. ⏱️', ephemeral=True)
@@ -172,19 +174,19 @@ def setup(bot):
         result += 'negatywnym. ❌\n'
 
     if sugestia['for']:
-      voters = ', '.join(bot.get_user(i).mention for i in sugestia['for'])
+      voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
       result += f'- Głosowali za: {voters}\n'
     else:
       result += '- Nikt nie głosował za.\n'
 
     if sugestia['abstain']:
-      voters = ', '.join(bot.get_user(i).mention for i in sugestia['abstain'])
+      voters = ', '.join(f'<@{i}>' for i in sugestia['abstain'])
       result += f'- Wstrzymali się od głosu: {voters}\n'
     else:
       result += '- Nikt nie wstrzymał się od głosu.\n'
 
     if sugestia['against']:
-      voters = ', '.join(bot.get_user(i).mention for i in sugestia['against'])
+      voters = ', '.join(f'<@{i}>' for i in sugestia['against'])
       result += f'- Głosowali przeciw: {voters}\n'
     else:
       result += '- Nikt nie głosował przeciw.\n'
