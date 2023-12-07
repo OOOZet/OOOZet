@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, logging, pprint, random, subprocess
+import discord, logging, random
 from datetime import datetime
 
 import database
@@ -23,43 +23,29 @@ from features import warns, xp
 
 def setup(bot):
   @bot.tree.context_menu(name='Odśwież role')
-  async def update_roles(interaction, user: discord.User):
-    await warns.update_roles_for(user)
-    await xp.update_roles_for(user)
-    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {user.mention}. 👌', ephemeral=True)
+  async def update_roles(interaction, member: discord.Member):
+    logging.info(f'Received user request to update roles for {member.id}')
+    await warns.update_roles_for(member)
+    await xp.update_roles_for(member)
+    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {member.mention}. 👌', ephemeral=True)
 
   @bot.listen()
-  async def on_member_join(user):
-    logging.info(f'User {user.id} joined the guild')
-    await warns.update_roles_for(user)
-    await xp.update_roles_for(user)
+  async def on_member_join(member):
+    logging.info(f'User {member.id} joined the guild')
+    await warns.update_roles_for(member)
+    await xp.update_roles_for(member)
 
   @bot.listen()
-  async def on_member_remove(user):
-    logging.info(f'User {user.id} left the guild')
-    if user.guild.system_channel_flags.join_notifications:
+  async def on_member_remove(member):
+    logging.info(f'User {member.id} left the guild')
+    if member.guild.system_channel_flags.join_notifications:
       announcement = random.choice([
-        f'Niestety nie ma już {user.mention} z nami… 🕯️',
-        f'Chwila ciszy dla {user.mention}… 🕯️',
-        f'{user.mention} już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
-        f'{user.mention} wyszedł z serwera… 🕯️',
+        f'Niestety nie ma już {member.mention} z nami… 🕯️',
+        f'Chwila ciszy dla {member.mention}… 🕯️',
+        f'{member.mention} już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
+        f'{member.mention} wyszedł z serwera… 🕯️',
       ])
-      await user.guild.system_channel.send(announcement)
-
-  @bot.tree.command(name='config', description='Wyświetla konfigurację bota')
-  async def _config(interaction):
-    result = config.copy()
-    del result['token']
-    result = pprint.pformat(result, sort_dicts=False)
-    await interaction.response.send_message(f'Moja wewnętrzna konfiguracja wygląda następująco:```json\n{result}```', ephemeral=True)
-
-  @bot.tree.command(description='Dziękuje istotnym twórcom bota')
-  async def credits(interaction):
-    await interaction.response.send_message('OOOZet powstał dzięki wspólnym staraniom <@671790729676324867>, <@386516541790748673>, <@536253933778370580> i innych. 🙂', ephemeral=True)
-
-  @bot.tree.command(description='Sprawdza ping bota')
-  async def ping(interaction):
-    await interaction.response.send_message(f'Pong! `{1000 * bot.latency:.0f}ms`', ephemeral=True)
+      await member.guild.system_channel.send(announcement)
 
   @bot.tree.command(description='Wzywa administrację po pomoc')
   async def alarm(interaction):
@@ -69,14 +55,16 @@ def setup(bot):
       await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨')
       return
 
+    now = datetime.now().astimezone()
     if 'alarm_last' in database.data:
-      now = datetime.now().astimezone()
       cooldown = parse_duration(config['alarm_cooldown'])
       if (now - database.data['alarm_last']).total_seconds() < cooldown:
         await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich {cooldown} sekund. ⏱️', ephemeral=True)
         return
-      database.data['alarm_last'] = now
-      database.should_save = True
+
+    logging.info(f'{interaction.user.id} has raised the alarm!')
+    database.data['alarm_last'] = now
+    database.should_save = True
 
     emoji = random.choice(['😟', '😖', '😱', '😮', '😵', '😵‍💫', '🥴'])
 
@@ -86,17 +74,3 @@ def setup(bot):
     for user in staff:
       await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {config["guild_name"]}!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
-
-  setup_time = datetime.now().astimezone()
-
-  @bot.tree.command(description='Sprawdza uptime serwera i bota')
-  async def uptime(interaction):
-    server_uptime = subprocess.run(['uptime', '-p'], capture_output=True, text=True).stdout.strip()
-    bot_uptime = interaction.created_at - setup_time
-    await interaction.response.send_message(
-      f'''
-Uptime serwera to: `{server_uptime}` 🖥️
-Uptime bota to: `{bot_uptime}` 🤖
-      ''',
-      ephemeral=True,
-    )

@@ -92,8 +92,8 @@ def format_datetime(datetime):
 def mention_datetime(datetime):
   return f'<t:{int(datetime.timestamp())}>'
 
-def is_staff(user):
-  return any(user.get_role(i) is not None for i in config['staff_roles'])
+def is_staff(member):
+  return any(member.get_role(i) is not None for i in config['staff_roles'])
 
 def mention_message(client, channel, msg):
   return client.get_partial_messageable(channel).get_partial_message(msg).jump_url

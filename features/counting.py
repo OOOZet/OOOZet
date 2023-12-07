@@ -28,6 +28,7 @@ def setup(bot):
       return
 
     if 'counting_clean_until' not in database.data:
+      logging.info('The counting channel has never been cleaned before')
       database.data['counting_clean_until'] = datetime.now().astimezone()
       database.should_save = True
 
@@ -38,9 +39,12 @@ def setup(bot):
         except ValueError:
           await msg.delete()
         else:
-          if 'counting_num' not in database.data or num == database.data['counting_num']:
-            if 'counting_num' not in database.data:
-              logging.info(f'The initial counting number has been called at {num}')
+          if num == database.data.get('counting_num', num) and not msg.author.bot:
+            if 'counting_num' in database.data:
+              logging.info(f'{msg.author.id} has upped the counting number to {num}')
+            else:
+              logging.info(f'{msg.author.id} has called the initial counting number at {num}')
+
             database.data['counting_num'] = num + 1
             database.data['counting_clean_until'] = msg.created_at
             database.should_save = True
@@ -56,4 +60,5 @@ def setup(bot):
   @bot.listen()
   async def on_message(msg):
     if config['counting_channel'] is not None and msg.channel.id == config['counting_channel']:
+      logging.info('Cleaning the counting channel after a new message')
       await clean() # on_message can come before on_ready.
