@@ -112,7 +112,7 @@ async def clean():
     return
 
   if 'sugestie_clean_until' not in database.data:
-    logging.info('The sugestie channel has never been cleaned before')
+    logging.info('#sugestie has never been cleaned before')
     database.data['sugestie_clean_until'] = datetime.now().astimezone()
     database.should_save = True
 
@@ -206,24 +206,23 @@ def setup(_bot):
   global bot
   bot = _bot
 
-  @discord.ext.tasks.loop(minutes=1)
+  @discord.ext.tasks.loop(seconds=parse_duration(config['sugestie_autoupdate']))
   async def loop():
     logging.info('Periodically updating ongoing sugestie')
     await update_ongoing()
 
   @bot.listen()
   async def on_ready():
-    logging.info('Updating ongoing sugestie')
-    await update_ongoing()
-    logging.info('Cleaning the sugestie channel')
-    await clean()
     loop.start()
+    await update_ongoing()
+    logging.info('Cleaning #sugestie')
+    await clean()
     logging.info('Sugestie is ready')
 
   @bot.listen()
   async def on_message(msg):
     if config['sugestie_channel'] is not None and msg.channel.id == config['sugestie_channel'] and msg.author != bot.user:
-      logging.info('Cleaning the sugestie channel after a new message')
+      logging.info('Cleaning #sugestie after a new message')
       await clean() # Same pattern as in counting.py
 
   sugestie = discord.app_commands.Group(name='sugestie', description='Komendy do sugestii')

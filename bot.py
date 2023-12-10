@@ -18,13 +18,14 @@ import asyncio, discord, discord.ext.commands, logging, threading
 
 import console
 from common import config
-from features import about_me, counting, misc, sugestie, warns, xp
+from features import about_me, counting, misc, reminders, sugestie, warns, xp
 
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
     about_me.setup(self)
     counting.setup(self)
     misc.setup(self)
+    reminders.setup(self)
     sugestie.setup(self)
     warns.setup(self)
     xp.setup(self)

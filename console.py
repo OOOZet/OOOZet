@@ -136,7 +136,7 @@ def listen():
           client.send(reply.encode())
           if not reply.endswith('\n'):
             client.send(b'\n')
-      except BrokenPipeError:
+      except BrokenPipeError: # The client sent a command and ran away.
         pass
 
     try: # We don't want any exceptions here because that would kill our thread and the whole console.

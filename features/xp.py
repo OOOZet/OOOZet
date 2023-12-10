@@ -89,7 +89,7 @@ def setup(_bot):
     level = xp_to_level(xp)
     left = level_to_xp(level + 1) - xp
     if user.bot:
-      await interaction.response.send_message(f'{user.mention} jest botem i nie może zbierać XP… 😐')
+      await interaction.response.send_message(f'{user.mention} jest botem i nie może zbierać XP… 😐', ephemeral=True)
     elif user == interaction.user:
       await interaction.response.send_message(f'Masz {xp} XP i tym samym poziom {level}. Do następnego brakuje ci jeszcze {left} XP. 📈', ephemeral=True)
     else:
@@ -111,6 +111,17 @@ def setup(_bot):
       user, xp = entry
       level = xp_to_level(xp)
       result += f'{i + 1}. <@{user}> z {xp} XP i poziomem {level}\n'
+    await interaction.response.send_message(result, ephemeral=True)
+
+  @xp.command(description='Wyświetla role za XP')
+  async def roles(interaction):
+    if not config['xp_roles']:
+      await interaction.response.send_message('Niestety nie ma żadnych ról, które mógłbyś dostać za XP. 😭', ephemeral=True)
+      return
+
+    result = 'Za zdobywanie kolejnych poziomów możesz dostać następujące role: 💰\n'
+    for level, role in config['xp_roles']:
+      result += f'- <@&{role}> za poziom {level}\n'
     await interaction.response.send_message(result, ephemeral=True)
 
 console.begin('xp')

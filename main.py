@@ -20,6 +20,7 @@ import discord, sys
 
 import bot, common, console, database
 from common import options
+from features import websub
 
 if __name__ == '__main__':
   i = 0
@@ -39,10 +40,13 @@ if __name__ == '__main__':
   common.load_config()
   console.start()
   database.start()
+  websub.start()
 
   bot.run()
 
-  try: # The database may already have been stopped by the console.
+  # The WebSub server and the database may already have been stopped by the console.
+  try:
+    websub.stop()
     database.stop()
   except:
     pass

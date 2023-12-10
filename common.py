@@ -21,31 +21,57 @@ options = {
 }
 
 config = {
-  'token': None,                  # Token twojego bota
-  'database': 'database.json',    # Ścieżka do pliku z baza danych
-  'autosave': '1m',               # Regularny odstęp czasu, w którym baza danych będzie automatycznie zapisywana, gdy jest to potrzebne
-  'console_host': 'localhost',    # Te dwa są w zasadzie oczywiste
+  'token': None,                             # Token twojego bota
+  'database': 'database.json',               # Ścieżka do pliku z baza danych
+  'autosave': '1m',                          # Regularny odstęp czasu, w którym baza danych będzie automatycznie zapisywana, gdy jest to potrzebne
+  'console_host': 'localhost',               # Te dwa są w zasadzie oczywiste
   'console_port': 2341,
-  'console_hello': 'OOOZet',      # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
-  'console_timeout': '1m',        # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
+  'console_hello': 'OOOZet',                 # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
+  'console_timeout': '1m',                   # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
 
-  'guild_name': 'OOOZ',           # Nazwa serwera, na którym rezyduje bot
-  'staff_roles': [],              # Role, których członkowie należą do administracji
-  'alarm_cooldown': '5m',         # Cooldown dla komendy /alarm
-  'warn_roles': [],               # Role kosmetyczne wskazujące na liczbę warnów użytkownika
-  'counting_channel': None,       # Kanał "#liczenie"
-  'xp_cooldown': '1m',            # Odstęp czasu, po którym można ponownie dostać XP
-  'xp_min_gain': 15,              # Minimalna ilość XP, którą można dostać za jedną wiadomość
-  'xp_max_gain': 40,              # Maksymalna ilość XP, którą można dostać za jedną wiadomość
-  'xp_ignored_channels': [],      # Kanały, które nie są liczone do XP
-  'xp_ignored_categories': [],    # Kategorie kanałów, które nie są liczone do XP
-  'xp_roles': [],                 # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
-  'xp_channel': None,             # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
-  'sugestie_channel': None,       # Kanal "#sugestie"
-  'sugestie_vote_role': None,     # Rola, która może głosować nad sugestiami
-  'sugestie_ping_role': None,     # Rola, która jest pingowana, gdy pojawia się nowa sugestia
-  'sugestie_vote_length': '24h',  # Czas na głosowanie nad sugestią
-  'sugestie_deciding_lead': None, # Przewaga, po której jedna z opcji wygrywa
+  'guild_name': 'OOOZ',                      # Nazwa serwera, na którym rezyduje bot
+  'staff_roles': [],                         # Role, których członkowie należą do administracji
+  'server_maintainer': None,                 # ID osoby odpowiedzialnej za logi bota
+
+  'alarm_cooldown': '5m',                    # Cooldown dla komendy /alarm
+  'warn_roles': [],                          # Role kosmetyczne wskazujące na liczbę warnów użytkownika
+  'counting_channel': None,                  # Kanał "#liczenie"
+
+  'xp_cooldown': '1m',                       # Odstęp czasu, po którym można ponownie dostać XP
+  'xp_min_gain': 15,                         # Minimalna ilość XP, którą można dostać za jedną wiadomość
+  'xp_max_gain': 40,                         # Maksymalna ilość XP, którą można dostać za jedną wiadomość
+  'xp_ignored_channels': [],                 # Kanały, które nie są liczone do XP
+  'xp_ignored_categories': [],               # Kategorie kanałów, które nie są liczone do XP
+  'xp_roles': [],                            # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
+  'xp_channel': None,                        # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
+
+  'sugestie_channel': None,                  # Kanal "#sugestie"
+  'sugestie_vote_role': None,                # Rola, która może głosować nad sugestiami
+  'sugestie_ping_role': None,                # Rola, która jest pingowana, gdy pojawia się nowa sugestia
+  'sugestie_vote_length': '24h',             # Czas na głosowanie nad sugestią
+  'sugestie_deciding_lead': None,            # Przewaga, po której jedna z opcji wygrywa
+  'sugestie_autoupdate': '1h',               # Regularny odstęp czasu, w którym trwające sugestie są automatycznie aktualizowane
+
+  'websub_host': None,                       # Adres tego serwera
+  'websub_port': 13579,                      # Port, na którym będzie odpalony serwer WebSub
+  'websub_lease_time': '1d',                 # Domyślny czas ważności subskrypcji WebSub
+  'websub_sub_retries': [                    # Opóźnienia kolejnych prób zasubskrybowania
+    '5s', '15s', '30s', '1m',
+    '5m', '15m', '30m', '1h'
+  ],
+  'websub_timeout': '1m',                    # Maksymalny czas oczekiwania na subskrypcję i weryfikację subskrypcji
+
+  'oki_channel': None,                       # Kanał, na który są wysyłane ogłoszenia o transmisjach na żywo i nowych filmach OKI
+  'oki_role': None,                          # Rola, która jest pingowana przy każdym ogłoszeniu o nowym filmie lub transmisji
+  'oki_youtube': 'UCw1Z4iA0T-QNaJ-sEOXeYCw', # ID (a nie nazwa użytkownika) kanału YouTube
+  'youtube_api_key': None,                   # Klucz dewelopera do API YouTube
+  'youtube_timeout': '1m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera YouTube
+  'codeforces_channel': None,                # Kanał, na który są wysyłane przypomnienia o rundach na Codeforces
+  'codeforces_role': None,                   # Rola, która jest pingowana w przypomnieniach o rundach
+  'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
+  'codeforces_max_duration': '5h',           # Interesują nas tylko rundy krótsze niż ten czas
+  'codeforces_poll_rate': '1d',              # Częstotliwość aktualizowania listy rund
+  'codeforces_timeout': '5m',                # Maksymalny czas oczekiwania na odpowiedź od serwera Codeforces
 }
 
 def load_config():
@@ -89,8 +115,9 @@ def parse_duration(string):
 def format_datetime(datetime):
   return datetime.strftime(f'%-d %B %Y %H:%M') # %-d is not portable.
 
-def mention_datetime(datetime):
-  return f'<t:{int(datetime.timestamp())}>'
+def mention_datetime(datetime, *, relative=False):
+  timestamp = int(datetime.timestamp())
+  return f'<t:{timestamp}:R>' if relative else f'<t:{timestamp}>'
 
 def is_staff(member):
   return any(member.get_role(i) is not None for i in config['staff_roles'])
@@ -101,7 +128,7 @@ def mention_message(client, channel, msg):
 def debacktick(string):
   return string.replace('`', '')
 
-def select_view(callback, owner):
+def select_view(callback, owner=None):
   select = discord.ui.Select()
   async def our_callback(interaction):
     await callback(interaction, select.values[0])

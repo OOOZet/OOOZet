@@ -25,9 +25,10 @@ def setup(bot):
   @bot.tree.context_menu(name='Odśwież role')
   async def update_roles(interaction, member: discord.Member):
     logging.info(f'Received user request to update roles for {member.id}')
+    await interaction.response.defer(ephemeral=True)
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
-    await interaction.response.send_message(f'Pomyślnie zaaktualizowano role za warny i XP dla {member.mention}. 👌', ephemeral=True)
+    await interaction.followup.send(f'Pomyślnie zaaktualizowano role za warny i XP dla {member.mention}. 👌')
 
   @bot.listen()
   async def on_member_join(member):
@@ -74,3 +75,13 @@ def setup(bot):
     for user in staff:
       await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {config["guild_name"]}!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
+
+  @bot.tree.command(description='Wyświetla skład administracji')
+  async def staff(interaction):
+    staff = {i for role in config['staff_roles'] for i in interaction.guild.get_role(role).members}
+
+    if not staff:
+      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨')
+      return
+
+    await interaction.response.send_message('W administracji tego serwera znajdują się: 👮\n' + ''.join(f'- {i.mention}\n' for i in staff), ephemeral=True)

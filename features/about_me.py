@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import pprint, subprocess
+import logging, pprint, random, subprocess
 from datetime import datetime
 
 from common import config
@@ -26,6 +26,7 @@ def setup(bot):
   async def _config(interaction):
     result = config.copy()
     del result['token']
+    del result['youtube_api_key']
     result = pprint.pformat(result, sort_dicts=False)
     await interaction.response.send_message(f'Moja wewnętrzna konfiguracja wygląda następująco:```json\n{result}```', ephemeral=True)
 
@@ -50,3 +51,13 @@ Uptime bota to: `{bot_uptime}` 🤖
       ''',
       ephemeral=True,
     )
+
+  @bot.tree.error
+  async def error(interaction, error):
+    logging.exception(f'Got exception in app command {repr(interaction.command.name)}')
+
+    emoji = random.choice(['😖', '🫠', '😵', '😵‍💫', '🥴'])
+    if config['server_maintainer'] is None:
+      await interaction.response.send_message(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}')
+    else:
+      await interaction.response.send_message(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}')
