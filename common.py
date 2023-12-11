@@ -29,7 +29,7 @@ config = {
   'console_hello': 'OOOZet',                 # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
   'console_timeout': '1m',                   # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
 
-  'guild_name': 'OOOZ',                      # Nazwa serwera, na którym rezyduje bot
+  'guild': None,                             # Serwer, na którym rezyduje bot
   'staff_roles': [],                         # Role, których członkowie należą do administracji
   'server_maintainer': None,                 # ID osoby odpowiedzialnej za logi bota
 
@@ -69,10 +69,14 @@ config = {
   'codeforces_channel': None,                # Kanał, na który są wysyłane przypomnienia o rundach na Codeforces
   'codeforces_role': None,                   # Rola, która jest pingowana w przypomnieniach o rundach
   'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
-  'codeforces_max_duration': '5h',           # Interesują nas tylko rundy krótsze niż ten czas
   'codeforces_poll_rate': '1d',              # Częstotliwość aktualizowania listy rund
   'codeforces_timeout': '5m',                # Maksymalny czas oczekiwania na odpowiedź od serwera Codeforces
 }
+
+def redacted_config():
+  result = config.copy()
+  result['token'] = result['websub_host'] = result['youtube_api_key'] = '[hidden]'
+  return result
 
 def load_config():
   logging.info('Loading config')
@@ -119,9 +123,6 @@ def mention_datetime(datetime, *, relative=False):
   timestamp = int(datetime.timestamp())
   return f'<t:{timestamp}:R>' if relative else f'<t:{timestamp}>'
 
-def is_staff(member):
-  return any(member.get_role(i) is not None for i in config['staff_roles'])
-
 def mention_message(client, channel, msg):
   return client.get_partial_messageable(channel).get_partial_message(msg).jump_url
 
@@ -145,3 +146,15 @@ def select_view(callback, owner=None):
 
 def find(value, iterable, *, proj=lambda x: x):
   return next(filter(lambda x: proj(x) == value, iterable))
+
+def hybrid_check(pred):
+  def our_pred(interaction):
+    if pred(interaction) is False:
+      return False
+    return True
+  def decorator_or_pred(arg=None):
+    if arg is None or isinstance(arg, discord.Interaction):
+      return our_pred(arg)
+    else:
+      return discord.app_commands.check(our_pred)(arg)
+  return decorator_or_pred

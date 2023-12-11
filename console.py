@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import common
-from common import config, parse_duration
+from common import config, parse_duration, redacted_config
 
 server = None
 thread = None
@@ -243,21 +243,13 @@ register('help',    None, 'prints this help message', op_help)
 register('bye',     None, 'closes this connection',   op_bye)
 register('restart', None, 'restarts the console',     op_restart)
 
-def op_all():
-  result = config.copy()
-  result['token'] = '[hidden from console commands]'
-  return result
-
-def op_get(arg):
-  return op_all()[arg]
-
 def op_set(arg):
   key, _, value = arg.partition(' ')
   config[key] = json.loads(value)
 
 begin('config')
-register('all',  None,                 'prints the config',              op_all)
-register('get',  '<key>',              'prints the value of config key', op_get)
+register('all',  None,                 'prints the config',              lambda: redacted_config())
+register('get',  '<key>',              'prints the value of config key', lambda arg: redacted_config()[arg])
 register('set',  '<key> <json value>', 'sets config key to value',       op_set)
 register('load', None,                 'loads the config from file',     common.load_config)
 register('save', None,                 'saves the config to file',       common.save_config)

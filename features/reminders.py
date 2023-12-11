@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from defusedxml import ElementTree
 
 import database
-from common import config, parse_duration, mention_datetime
+from common import config, mention_datetime, parse_duration
 from features import websub
 
 def setup(bot):
@@ -40,7 +40,6 @@ def setup(bot):
       delay = (video.time - datetime.now().astimezone()).total_seconds()
       if delay < 0:
         return
-
       await asyncio.sleep(delay)
       logging.info(f'Reminding about YouTube livestream {video.id}')
 
@@ -49,7 +48,7 @@ def setup(bot):
 
     mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
     if video.is_livestream:
-      announcement = f'{mention} Na kanale OKI właśnie zaczyna się [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} Na kanale OKI właśnie zaczyna się transmisja na żywo [{video.title}]({video.link})! 🔔'
     else:
       announcement = f'{mention} Na kanale OKI został opublikowany nowy film [{video.title}]({video.link})! 🔔'
     await bot.get_channel(config['oki_channel']).send(announcement)
@@ -126,6 +125,10 @@ def setup(bot):
     def link(self):
       return f'https://codeforces.com/contest/{self.id}'
 
+    @property
+    def is_niche(self):
+      return all(i not in self.name for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4'])
+
   async def remind_codeforces(contest, delay=0):
     await asyncio.sleep(delay)
     logging.info(f'Reminding about Codeforces contest {contest.id}')
@@ -133,15 +136,12 @@ def setup(bot):
     if config['codeforces_channel'] is None:
       return
 
-    if contest.duration > parse_duration(config['codeforces_max_duration']):
-      logging.info(f'Contest {contest.id} is too long')
-      return
-
-    mention = f'<@&{config["codeforces_role"]}>' if config['codeforces_role'] is not None else ''
+    if not contest.is_niche and config['codeforces_role'] is not None:
+      mention = f'<@&{config["codeforces_role"]}>'
+    else:
+      mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['codeforces_channel']).send(
-      f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔'
-    )
+    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔')
 
   codeforces_reminders = []
 

@@ -14,27 +14,32 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import logging, pprint, random, subprocess
+import discord, json, subprocess
 from datetime import datetime
+from io import StringIO
 
-from common import config
+from common import redacted_config
 
 def setup(bot):
   setup_time = datetime.now().astimezone()
 
-  @bot.tree.command(name='config', description='Wyświetla konfigurację bota')
-  async def _config(interaction):
-    result = config.copy()
-    del result['token']
-    del result['youtube_api_key']
-    result = pprint.pformat(result, sort_dicts=False)
-    await interaction.response.send_message(f'Moja wewnętrzna konfiguracja wygląda następująco:```json\n{result}```', ephemeral=True)
+  @bot.tree.command(description='Wyświetla konfigurację bota')
+  async def config(interaction):
+    result = json.dumps(redacted_config(), indent=2)
+    await interaction.response.send_message(
+      'Załączam moją wewnętrzną konfigurację. 😉',
+      file=discord.File(StringIO(result), 'config.json'),
+      ephemeral=True,
+    )
 
   @bot.tree.command(description='Dziękuje istotnym twórcom bota')
   async def credits(interaction):
-    users = [671790729676324867, 386516541790748673, 536253933778370580]
-    contributors = ', '.join(f'<@{i}>' for i in users)
-    await interaction.response.send_message(f'OOOZet powstał dzięki wspólnym staraniom {contributors} i innych. 🙂', ephemeral=True)
+    ids = [671790729676324867, 386516541790748673, 536253933778370580]
+    contributors = ', '.join(f'<@{i}>' for i in ids)
+    await interaction.response.send_message(
+      f'OOOZet powstał dzięki wspólnym staraniom {contributors} i innych. [Ty też możesz znaleźć się wśród tego nielicznego grona!](https://github.com/OOOZet/OOOZet) 🙂',
+      ephemeral=True, suppress_embeds=True,
+    )
 
   @bot.tree.command(description='Sprawdza ping bota')
   async def ping(interaction):
@@ -51,13 +56,3 @@ Uptime bota to: `{bot_uptime}` 🤖
       ''',
       ephemeral=True,
     )
-
-  @bot.tree.error
-  async def error(interaction, error):
-    logging.exception(f'Got exception in app command {repr(interaction.command.name)}')
-
-    emoji = random.choice(['😖', '🫠', '😵', '😵‍💫', '🥴'])
-    if config['server_maintainer'] is None:
-      await interaction.response.send_message(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}')
-    else:
-      await interaction.response.send_message(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}')

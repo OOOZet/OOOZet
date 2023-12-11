@@ -52,6 +52,9 @@ def load():
 def save():
   logging.info('Saving database')
   with lock:
+    global should_save
+    should_save = False
+
     if os.path.exists(config['database']):
       os.replace(config['database'], config['database'] + '.old')
 
@@ -65,9 +68,6 @@ def save():
           return super().default(value)
     with open(config['database'], 'x') as file:
       json.dump(data, file, cls=Encoder)
-
-    global should_save
-    should_save = False
 
 autosave_thread = None
 autosave_stop = None

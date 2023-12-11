@@ -18,11 +18,36 @@ import discord, logging, random
 from datetime import datetime
 
 import database
-from common import config, parse_duration
+from common import config, hybrid_check, parse_duration
 from features import warns, xp
 
-def setup(bot):
+bot = None
+
+def get_staff():
+  return {i for role in config['staff_roles'] for i in bot.get_guild(config['guild']).get_role(role).members}
+
+class NoStaffError(discord.app_commands.CheckFailure):
+  pass
+
+@hybrid_check
+def check_staff_nonempty(interaction):
+  if all(not bot.get_guild(config['guild']).get_role(i).members for i in config['staff_roles']):
+    raise NoStaffError()
+
+def setup(_bot):
+  global bot
+  bot = _bot
+
+  pass_error_on = bot.tree.on_error
+  @bot.tree.error
+  async def on_error(interaction, error):
+    if isinstance(error, NoStaffError):
+      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨', ephemeral=True)
+    else:
+      await pass_error_on(interaction, error)
+
   @bot.tree.context_menu(name='Odśwież role')
+  @discord.app_commands.guilds(config['guild'])
   async def update_roles(interaction, member: discord.Member):
     logging.info(f'Received user request to update roles for {member.id}')
     await interaction.response.defer(ephemeral=True)
@@ -32,12 +57,18 @@ def setup(bot):
 
   @bot.listen()
   async def on_member_join(member):
+    if member.guild.id != config['guild']:
+      return
+
     logging.info(f'User {member.id} joined the guild')
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
 
   @bot.listen()
   async def on_member_remove(member):
+    if member.guild.id != config['guild']:
+      return
+
     logging.info(f'User {member.id} left the guild')
     if member.guild.system_channel_flags.join_notifications:
       announcement = random.choice([
@@ -49,14 +80,11 @@ def setup(bot):
       await member.guild.system_channel.send(announcement)
 
   @bot.tree.command(description='Wzywa administrację po pomoc')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff_nonempty
   async def alarm(interaction):
-    staff = {i for role in config['staff_roles'] for i in interaction.guild.get_role(role).members}
-
-    if not staff:
-      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨')
-      return
-
     now = datetime.now().astimezone()
+
     if 'alarm_last' in database.data:
       cooldown = parse_duration(config['alarm_cooldown'])
       if (now - database.data['alarm_last']).total_seconds() < cooldown:
@@ -67,21 +95,17 @@ def setup(bot):
     database.data['alarm_last'] = now
     database.should_save = True
 
+    staff = get_staff()
     emoji = random.choice(['😟', '😖', '😱', '😮', '😵', '😵‍💫', '🥴'])
-
     mentions = ' '.join(i.mention for i in staff)
     await interaction.response.send_message(f'{mentions} Potrzebna natychmiastowa interwencja!!! {emoji}')
-
     for user in staff:
-      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {config["guild_name"]}!!! {emoji}')
+      guild = bot.get_guild(config['guild'])
+      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {guild}!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
 
   @bot.tree.command(description='Wyświetla skład administracji')
+  @check_staff_nonempty
   async def staff(interaction):
-    staff = {i for role in config['staff_roles'] for i in interaction.guild.get_role(role).members}
-
-    if not staff:
-      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨')
-      return
-
-    await interaction.response.send_message('W administracji tego serwera znajdują się: 👮\n' + ''.join(f'- {i.mention}\n' for i in staff), ephemeral=True)
+    result = ''.join(f'- {i.mention}\n' for i in get_staff())
+    await interaction.response.send_message(f'W administracji serwera znajdują się: 👮\n{result}', ephemeral=True)

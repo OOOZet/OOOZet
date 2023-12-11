@@ -15,15 +15,26 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio, discord, logging, random
+from dataclasses import dataclass
 from datetime import datetime
 
 import console, database
-from common import config, format_datetime, is_staff, mention_datetime, debacktick, select_view, find
+from common import config, debacktick, find, format_datetime, mention_datetime, select_view
+from features.utils import check_staff
 
 bot = None
 
+@dataclass
+class NoWarnsError(discord.app_commands.CheckFailure):
+  user: discord.User
+
+def check_warns_for(user):
+  if not database.data.get('warns', {}).get(user.id, []):
+    raise NoWarnsError(user)
+
 async def update_roles_for(member):
   logging.info(f'Updating warn roles for {member.id}')
+  assert(member.guild.id == config['guild'])
   roles = [member.guild.get_role(i) for i in config['warn_roles']]
   await member.remove_roles(*roles)
   count = len(database.data.get('warns', {}).get(member.id, []))
@@ -32,18 +43,22 @@ async def update_roles_for(member):
 
 async def update_roles():
   logging.info('Updating warn roles for all members')
-  for member in bot.get_all_members():
+  for member in bot.get_guild(config['guild']).members:
     await update_roles_for(member)
 
 def setup(_bot):
   global bot
   bot = _bot
 
-  async def warn(interaction, member, reason):
-    if not is_staff(interaction.user):
-      await interaction.response.send_message('Nie masz uprawnień do warnowania, tylko administracja może to robić. 😡', ephemeral=True)
-      return
+  pass_error_on = bot.tree.on_error
+  @bot.tree.error
+  async def on_error(interaction, error):
+    if isinstance(error, NoWarnsError):
+      await interaction.response.send_message(f'{error.user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
+    else:
+      await pass_error_on(interaction, error)
 
+  async def warn(interaction, member, reason):
     logging.info(f'Adding warn for {member.id} with reason {repr(reason)}')
     warn = {
       'time': datetime.now().astimezone(),
@@ -58,10 +73,14 @@ def setup(_bot):
     await interaction.response.send_message(f'{member.mention} właśnie dostał swojego {count}-ego warna za `{debacktick(reason)}`! 😒')
 
   @bot.tree.command(name='warn', description='Warnuje użytkownika')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff('warnowania')
   async def cmd_warn(interaction, member: discord.Member, reason: str):
     await warn(interaction, member, reason)
 
   @bot.tree.context_menu(name='Zwarnuj')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff('warnowania')
   async def menu_warn(interaction, member: discord.Member):
     async def on_submit(interaction2):
       await warn(interaction2, member, text_input.value)
@@ -70,67 +89,54 @@ def setup(_bot):
     modal = discord.ui.Modal(title=f'Zwarnuj {member.name}')
     modal.on_submit = on_submit
     modal.add_item(text_input)
-
-    # Maybe we should first check whether the user is staff?
     await interaction.response.send_modal(modal)
 
   async def unwarn(interaction, member):
-    if not is_staff(interaction.user):
-      await interaction.response.send_message('Nie masz uprawnień do odbierania warnów, tylko administracja może to robić. 😡', ephemeral=True)
-      return
-
-    warns = database.data.get('warns', {}).get(member.id, [])
-
-    if not warns:
-      await interaction.response.send_message(f'{member.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
-      return
+    check_warns_for(member)
 
     async def callback(interaction2, choice):
-      warn = find(int(choice), warns, proj=lambda x: id(x))
+      warn = find(int(choice), database.data['warns'][member.id], proj=id)
 
       logging.info(f'Removing warn for {member.id} with reason {repr(warn["reason"])} from {warn["time"]}')
       warns.remove(warn)
       database.should_save = True
-
       await update_roles_for(member)
 
       reason = debacktick(warn['reason'])
       time = mention_datetime(warn["time"])
       await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia {time} użytkownikowi {member.mention}! 🥳', view=None)
-
       await interaction2.response.defer()
 
     select, view = select_view(callback, interaction.user)
-    for warn in warns:
-      select.add_option(label=warn['reason'], value=id(warn), description=format_datetime(warn["time"]))
-
+    for warn in database.data['warns'][member.id]:
+      select.add_option(label=warn['reason'], value=id(warn), description=format_datetime(warn['time']))
     await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {member.mention}?', view=view)
 
   @bot.tree.command(name='unwarn', description='Odbiera warna użytkownikowi')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff('odbierania warnów')
   async def cmd_unwarn(interaction, member: discord.Member):
     await unwarn(interaction, member)
 
   @bot.tree.context_menu(name='Odbierz warna')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff('odbierania warnów')
   async def menu_unwarn(interaction, member: discord.Member):
     await unwarn(interaction, member)
 
   async def warns(interaction, user):
-    warns = database.data.get('warns', {}).get(user.id, [])
-
-    if not warns:
-      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
-      return
+    check_warns_for(user)
 
     result = random.choice([
-      f'{user.mention} ma już na swoim koncie parę złych uczynków… 😔',
-      f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕',
-      f'Na {user.mention} czeka już tylko czyściec… 😩',
+      f'{user.mention} ma już na swoim koncie parę złych uczynków… 😔\n',
+      f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕\n',
+      f'Na {user.mention} czeka już tylko czyściec… 😩\n',
     ])
 
-    for warn in warns:
+    for warn in database.data['warns'][user.id]:
       reason = debacktick(warn['reason'])
       time = mention_datetime(warn["time"])
-      result += f'\n- `{reason}` w dniu {time}'
+      result += f'- `{reason}` w dniu {time}\n'
 
     await interaction.response.send_message(result, ephemeral=True)
 

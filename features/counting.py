@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging
+import asyncio, logging
 from datetime import datetime
 
-import console, database
+import database
 from common import config
 
 def setup(bot):

@@ -18,11 +18,72 @@ import asyncio, discord, discord.ext.tasks, logging
 from datetime import datetime, timedelta
 
 import console, database
-from common import config, parse_duration, format_datetime, mention_datetime, is_staff, mention_message, debacktick, select_view, find
+from common import config, debacktick, find, format_datetime, hybrid_check, mention_datetime, mention_message, parse_duration, select_view
+from features.utils import check_staff
 
 bot = None
 
-async def update_sugestia(sugestia):
+def is_ongoing(sugestia):
+  return sugestia['did_pass'] is None
+
+def is_pending(sugestia):
+  return sugestia['did_pass'] is True and sugestia['done'] is None
+
+def emoji_status_of(sugestia):
+  if sugestia['did_pass'] is None:
+    return '❔'
+  elif not sugestia['did_pass']:
+    return '❌'
+  elif sugestia['done'] is None:
+    return '✔️'
+  else:
+    return '✅'
+
+def describe(sugestia):
+  msg = mention_message(bot, sugestia['channel'], sugestia['id'])
+  vote_start = mention_datetime(sugestia['vote_start'])
+  text = debacktick(sugestia['text'])
+  result = f'Sugestia {msg} z dnia {vote_start} ma następującą treść:```\n{text}```'
+
+  vote_end = mention_datetime(sugestia['vote_end'])
+  if sugestia['did_pass'] is None:
+    result += f'Głosowanie jeszcze trwa i skończy się {vote_end}. ❔\n'
+  else:
+    result += f'Głosowanie zakończyło się {vote_end} wynikiem '
+    if sugestia['did_pass']:
+      result += 'pozytywnym. ✅\n'
+    else:
+      result += 'negatywnym. ❌\n'
+
+  if sugestia['for']:
+    voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
+    result += f'- Głosowali za: {voters}\n'
+  else:
+    result += '- Nikt nie głosował za.\n'
+
+  if sugestia['abstain']:
+    voters = ', '.join(f'<@{i}>' for i in sugestia['abstain'])
+    result += f'- Wstrzymali się od głosu: {voters}\n'
+  else:
+    result += '- Nikt nie wstrzymał się od głosu.\n'
+
+  if sugestia['against']:
+    voters = ', '.join(f'<@{i}>' for i in sugestia['against'])
+    result += f'- Głosowali przeciw: {voters}\n'
+  else:
+    result += '- Nikt nie głosował przeciw.\n'
+
+  if sugestia['did_pass'] is True:
+    if sugestia['done'] is None:
+      result += 'Sugestia nie została jeszcze wykonana przez administrację. ❓\n'
+    else:
+      done = mention_datetime(sugestia['done'])
+      changes = debacktick(sugestia['changes'])
+      result += f'Sugestia została wykonana {done} z opisem zmian: `{changes}` ✅\n'
+
+  return result
+
+async def update(sugestia):
   logging.info(f'Updating sugestia {sugestia["id"]}')
 
   if config['sugestie_deciding_lead'] is not None and abs(len(sugestia['for']) - len(sugestia['against'])) >= config['sugestie_deciding_lead']:
@@ -86,7 +147,7 @@ async def update_sugestia(sugestia):
           }
         await interaction.response.send_message(replies[choice], ephemeral=True)
 
-      await update_sugestia(sugestia)
+      await update(sugestia)
 
     for button in view.children:
       button.callback = callback
@@ -96,15 +157,14 @@ async def update_sugestia(sugestia):
   except discord.errors.NotFound:
     logging.warn(f'Sugestia {sugestia["id"]} is missing')
 
-async def update_ongoing():
-  for sugestia in database.data.get('sugestie', []):
-    if sugestia['did_pass'] is None:
-      await update_sugestia(sugestia)
-
 async def update_all():
   logging.info('Updating all sugestie')
   for sugestia in database.data.get('sugestie', []):
-    await update_sugestia(sugestia)
+    await update(sugestia)
+
+async def update_ongoing():
+  for sugestia in filter(is_ongoing, database.data.get('sugestie', [])):
+    await update(sugestia)
 
 cleaning_lock = asyncio.Lock()
 async def clean():
@@ -146,65 +206,37 @@ async def clean():
       database.data['sugestie_clean_until'] = msg.created_at
       database.should_save = True
 
-      await update_sugestia(sugestia)
+      await update(sugestia)
 
-def describe_sugestia(sugestia):
-  msg = mention_message(bot, sugestia["channel"], sugestia["id"])
-  vote_start = mention_datetime(sugestia["vote_start"])
-  text = debacktick(sugestia["text"])
-  result = f'Sugestia {msg} z dnia {vote_start} ma następującą treść:```\n{text}```'
+class NoSugestieError(discord.app_commands.CheckFailure):
+  pass
 
-  vote_end = mention_datetime(sugestia["vote_end"])
-  if sugestia['did_pass'] is None:
-    result += f'Głosowanie jeszcze trwa i skończy się {vote_end}. ❔\n'
-  else:
-    result += f'Głosowanie zakończyło się {vote_end} wynikiem '
-    if sugestia['did_pass']:
-      result += 'pozytywnym. ✅\n'
-    else:
-      result += 'negatywnym. ❌\n'
+class NoPendingSugestieError(discord.app_commands.CheckFailure):
+  pass
 
-  if sugestia['for']:
-    voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
-    result += f'- Głosowali za: {voters}\n'
-  else:
-    result += '- Nikt nie głosował za.\n'
+@hybrid_check
+def check_any(interaction):
+  if not database.data.get('sugestie', []):
+    raise NoSugestieError()
 
-  if sugestia['abstain']:
-    voters = ', '.join(f'<@{i}>' for i in sugestia['abstain'])
-    result += f'- Wstrzymali się od głosu: {voters}\n'
-  else:
-    result += '- Nikt nie wstrzymał się od głosu.\n'
-
-  if sugestia['against']:
-    voters = ', '.join(f'<@{i}>' for i in sugestia['against'])
-    result += f'- Głosowali przeciw: {voters}\n'
-  else:
-    result += '- Nikt nie głosował przeciw.\n'
-
-  if sugestia['did_pass'] is True:
-    if sugestia['done'] is None:
-      result += 'Sugestia nie została jeszcze wykonana przez administrację. ❓\n'
-    else:
-      done = mention_datetime(sugestia["done"])
-      changes = debacktick(sugestia["changes"])
-      result += f'Sugestia została wykonana {done} z opisem zmian: `{changes}` ✅\n'
-
-  return result
-
-def emoji_status_of(sugestia):
-  if sugestia['did_pass'] is None:
-    return '❔'
-  elif not sugestia['did_pass']:
-    return '❌'
-  elif sugestia['done'] is None:
-    return '✔️'
-  else:
-    return '✅'
+@hybrid_check
+def check_pending(interaction):
+  if not any(map(is_pending, database.data.get('sugestie', []))):
+    raise NoPendingSugestieError()
 
 def setup(_bot):
   global bot
   bot = _bot
+
+  pass_error_on = bot.tree.on_error
+  @bot.tree.error
+  async def on_error(interaction, error):
+    if isinstance(error, NoSugestieError):
+      await interaction.response.send_message('Nie zostały jeszcze przedłożone żadne sugestie… 🤨', ephemeral=True)
+    elif isinstance(error, NoPendingSugestieError):
+      await interaction.response.send_message('Nie ma żadnych sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
+    else:
+      await pass_error_on(interaction, error)
 
   @discord.ext.tasks.loop(seconds=parse_duration(config['sugestie_autoupdate']))
   async def loop():
@@ -225,56 +257,41 @@ def setup(_bot):
       logging.info('Cleaning #sugestie after a new message')
       await clean() # Same pattern as in counting.py
 
-  sugestie = discord.app_commands.Group(name='sugestie', description='Komendy do sugestii')
+  sugestie = discord.app_commands.Group(name='sugestie', description='Komendy do sugestii', guild_ids=[config['guild']])
   bot.tree.add_command(sugestie)
 
   @sugestie.command(description='Wyświetla sugestię')
+  @check_any
   async def show(interaction):
-    sugestie = database.data.get('sugestie', [])
-
-    if not sugestie:
-      await interaction.response.send_message('Na tym serwerze nie zostały jeszcze przedłożone żadne sugestie… 🤨', ephemeral=True)
-      return
-
     async def callback(interaction2, choice):
-      sugestia = find(int(choice), sugestie, proj=lambda x: x['id'])
-      await interaction2.response.send_message(describe_sugestia(sugestia), ephemeral=True)
+      sugestia = find(int(choice), database.data['sugestie'], proj=lambda x: x['id'])
+      await interaction2.response.send_message(describe(sugestia), ephemeral=True)
 
     select, view = select_view(callback, interaction.user)
-    for sugestia in sugestie:
+    for sugestia in database.data['sugestie']:
       select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
-
     await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=view, ephemeral=True)
 
   @sugestie.command(description='Oznacza przegłosowaną sugestię jako wykonaną')
+  @check_pending
+  @check_staff('wykonywania sugestii')
   async def done(interaction, changes: str):
-    if not is_staff(interaction.user):
-      await interaction.response.send_message('Nie masz uprawnień do wykonywania sugestii, tylko administracja może to robić. 😡', ephemeral=True)
-      return
-
-    sugestie = [i for i in database.data.get('sugestie', []) if i['did_pass'] is True and i['done'] is None]
-
-    if not sugestie:
-      await interaction.response.send_message('Nie ma żadnych sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
-      return
-
     async def callback(interaction2, choice):
-      sugestia = find(int(choice), sugestie, proj=lambda x: x['id'])
+      sugestia = find(int(choice), filter(is_pending, database.data['sugestie']), proj=lambda x: x['id'])
 
       logging.info(f'{interaction2.user.id} has marked sugestia {sugestia["id"]} as done')
-      sugestia['done'] = interaction2.created_at
-      sugestia['changes'] = changes
-      database.should_save = True
+      with database.lock:
+        sugestia['done'] = interaction2.created_at
+        sugestia['changes'] = changes
+        database.should_save = True
 
       msg = mention_message(bot, sugestia["channel"], sugestia["id"])
       await interaction.edit_original_response(content=f'Pomyślnie oznaczono sugestię {msg} jako wykonaną z opisem zmian `{debacktick(changes)}`! 🥳', view=None)
-
       await interaction2.response.defer()
 
     select, view = select_view(callback, interaction.user)
-    for sugestia in sugestie:
+    for sugestia in filter(is_pending, database.data['sugestie']):
       select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
-
     await interaction.response.send_message(f'Którą sugestię chcesz oznaczyć jako wykonaną z opisem zmian `{debacktick(changes)}`?', view=view)
 
 console.begin('sugestie')

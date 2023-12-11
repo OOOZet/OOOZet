@@ -14,22 +14,37 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, discord.ext.commands, logging, threading
+import asyncio, discord, discord.ext.commands, logging, random, threading
 
 import console
 from common import config
-from features import about_me, counting, misc, reminders, sugestie, warns, xp
+from features import about_me, counting, misc, reminders, rules, sugestie, utils, warns, xp
 
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
+    @self.tree.error
+    async def on_error(interaction, error):
+      logging.exception(f'Got exception in app command {repr(interaction.command.name)}')
+
+      send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
+      emoji = random.choice(['😖', '🫠', '😵', '😵‍💫', '🥴'])
+      if config['server_maintainer'] is None:
+        await send(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}', ephemeral=True)
+      else:
+        await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True)
+
     about_me.setup(self)
     counting.setup(self)
     misc.setup(self)
     reminders.setup(self)
+    rules.setup(self)
     sugestie.setup(self)
+    utils.setup(self)
     warns.setup(self)
     xp.setup(self)
+
     await self.tree.sync()
+    await self.tree.sync(guild=discord.Object(config['guild']))
 
   def __init__(self):
     intents = discord.Intents.default()
@@ -40,7 +55,6 @@ class Client(discord.ext.commands.Bot):
   async def on_ready(self):
     logging.info(f'Logged in as {repr(str(self.user))}')
 
-# TODO: aktualizowanie regulaminu
 # TODO: egzekwowanie regulaminu
 
 client = None

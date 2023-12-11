@@ -47,6 +47,9 @@ if __name__ == '__main__':
   # The WebSub server and the database may already have been stopped by the console.
   try:
     websub.stop()
+  except:
+    pass
+  try:
     database.stop()
   except:
     pass
