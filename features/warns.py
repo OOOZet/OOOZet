@@ -98,7 +98,7 @@ def setup(_bot):
       warn = find(int(choice), database.data['warns'][member.id], proj=id)
 
       logging.info(f'Removing warn for {member.id} with reason {repr(warn["reason"])} from {warn["time"]}')
-      warns.remove(warn)
+      database.data['warns'][member.id].remove(warn)
       database.should_save = True
       await update_roles_for(member)
 

@@ -40,6 +40,7 @@ def setup(bot):
       delay = (video.time - datetime.now().astimezone()).total_seconds()
       if delay < 0:
         return
+      logging.info(f'Setting reminder for YouTube livestream {video.id} for {video.time}')
       await asyncio.sleep(delay)
       logging.info(f'Reminding about YouTube livestream {video.id}')
 
@@ -92,9 +93,7 @@ def setup(bot):
     last_published = database.data['oki_last_published']
     for video in parse_youtube_feed(content):
       if video.is_livestream and video.time > datetime.now().astimezone():
-        logging.info(f'Setting reminder for YouTube livestream {video.id} for {video.time}')
         asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop)
-
       elif not video.is_livestream and video.time > last_published:
         asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop)
         with database.lock:
@@ -130,8 +129,10 @@ def setup(bot):
       return all(i not in self.name for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4'])
 
   async def remind_codeforces(contest, delay=0):
-    await asyncio.sleep(delay)
-    logging.info(f'Reminding about Codeforces contest {contest.id}')
+    if delay > 0:
+      logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
+      await asyncio.sleep(delay)
+      logging.info(f'Reminding about Codeforces contest {contest.id}')
 
     if config['codeforces_channel'] is None:
       return
@@ -172,10 +173,7 @@ def setup(bot):
       )
 
       delay = -entry['relativeTimeSeconds'] - parse_duration(config['codeforces_advance'])
-      if delay < 0:
-        continue
-
-      logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
-      codeforces_reminders.append(asyncio.create_task(remind_codeforces(contest, delay)))
+      if delay > 0:
+        codeforces_reminders.append(asyncio.create_task(remind_codeforces(contest, delay)))
 
   poll_codeforces.start()

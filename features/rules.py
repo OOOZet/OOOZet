@@ -45,7 +45,7 @@ def setup(bot):
   @rules.command(description='Wyświetla obowiązujący regulamin')
   @check_rules
   async def show(interaction):
-    result = max(database.data['rules'], key=lambda x: x['time'])['text']
+    result = max(database.data['rules'], key=lambda x: x['time'])['text'] + '\n'
     await interaction.response.send_message(
       f'Załączam regulamin obowiązujący na serwerze. 😉',
       file=discord.File(StringIO(result), 'rules.md'),
@@ -56,10 +56,10 @@ def setup(bot):
   @check_rules
   async def history(interaction):
     async def callback(interaction2, choice):
-      result = find(int(choice), database.data['rules'], proj=id)
+      result = find(int(choice), database.data['rules'], proj=id)['text'] + '\n'
       await interaction2.response.send_message(
         f'Załączam regulamin z dnia {mention_datetime(result["time"])}. 😉',
-        file=discord.File(StringIO(result['text']), 'rules.md'),
+        file=discord.File(StringIO(result), 'rules.md'),
         ephemeral=True,
       )
 
@@ -67,6 +67,17 @@ def setup(bot):
     for rules in database.data['rules']:
       select.add_option(label=format_datetime(rules['time']), value=id(rules))
     await interaction.response.send_message('Którą wersję regulaminu chcesz zobaczyć?', view=view, ephemeral=True)
+
+  def fragment_text(string):
+    fragment = []
+    for line in string.splitlines():
+      line = line or '_ _'
+      if line == '_ _' and fragment and fragment[-1] != '_ _':
+        yield '\n'.join(fragment)
+        fragment = []
+      fragment.append(line)
+    if fragment:
+      yield '\n'.join(fragment)
 
   async def resend(interaction):
     if not interaction.response.is_done():
@@ -80,10 +91,8 @@ def setup(bot):
 
     await channel.purge() # This will delete at most 100 messages in case there was a mistake.
     text = max(database.data['rules'], key=lambda x: x['time'])['text']
-    fragments = iter(filter(lambda x: x, text.split('\n\n')))
-    await channel.send(next(fragments))
-    for fragment in fragments:
-      await channel.send('_ _\n' + fragment)
+    for fragment in fragment_text(text):
+      await channel.send(fragment)
 
     await interaction.followup.send('Pomyślnie zaaktualizowano kanał z regulaminem. 🫡', ephemeral=True)
 
@@ -95,21 +104,36 @@ def setup(bot):
 
   @rules.command(description='Ustanawia nowy regulamin')
   @check_staff('ustanawiania nowego regulaminu')
-  async def set(interaction, text: discord.Attachment, sugestia: bool):
+  async def set(interaction, text: discord.Attachment, ile_sugestii: discord.app_commands.Range[int, 0, 4]): # Max is 4 due to limitation in Discord.
     try:
-      text = (await text.read()).decode().replace('\r\n', '\n')
+      text = (await text.read()).decode()
+      text = '\n'.join(line.rstrip() for line in text.strip().splitlines())
     except UnicodeDecodeError:
       await interaction.response.send_message('Załączony regulamin musi być plikiem tekstowym… 🤨', ephemeral=True)
       return
+    if not text:
+      await interaction.response.send_message('Regulamin nie może być pusty… 🤨', ephemeral=True)
+      return
+    if any(len(i) > 2000 for i in fragment_text(text)):
+      await interaction.response.send_message('Regulamin nie może zawierać paragrafy dłuższe niż ~2000 znaków. 😊', ephemeral=True)
+      return
 
-    async def callback(interaction2, choice):
-      sugestia = int(choice) if choice is not None else None
-      logging.info('Setting new rules' + (f' thanks to sugestia {sugestia}' if sugestia is not None else ''))
+    if sum(map(sugestie.is_pending, database.data.get('sugestie', []))) < ile_sugestii:
+      await interaction.response.send_message(f'Nie ma co najmniej {ile_sugestii} sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
+      return
+
+    async def on_submit(interaction2):
       rules = {
         'time': interaction2.created_at,
         'text': text,
-        'sugestia': sugestia,
+        'sugestie': list({int(select.values[0]) for select in view.children[:-1]}) if ile_sugestii > 0 else [],
       }
+
+      if len(rules['sugestie']) < ile_sugestii:
+        await interaction2.response.send_message('Nie możesz wybrać tej samej sugestii wiele razy… 🤨', ephemeral=True)
+        return
+
+      logging.info('Setting new rules')
       database.data.setdefault('rules', []).append(rules)
       database.should_save = True
 
@@ -120,11 +144,22 @@ def setup(bot):
 
       await resend(interaction2)
 
-    if sugestia:
-      sugestie.check_pending()
-      select, view = select_view(callback, interaction.user)
-      for sugestia in filter(sugestie.is_pending, database.data['sugestie']):
-        select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
-      await interaction.response.send_message('Z którą sugestią jest powiązana ta zmiana regulaminu?', view=view)
+    if ile_sugestii == 0:
+      await on_submit(interaction)
     else:
-      await callback(interaction, None)
+      view = discord.ui.View()
+
+      for i in range(ile_sugestii):
+        select = discord.ui.Select()
+        async def callback(interaction):
+          await interaction.response.defer()
+        select.callback = callback
+        for sugestia in filter(sugestie.is_pending, database.data['sugestie']):
+          select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
+        view.add_item(select)
+
+      submit = discord.ui.Button(style=discord.ButtonStyle.success, label='Zatwierdź')
+      submit.callback = on_submit
+      view.add_item(submit)
+
+      await interaction.response.send_message('Z którymi sugestiami jest powiązana ta zmiana regulaminu?', view=view)
