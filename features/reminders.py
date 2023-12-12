@@ -75,12 +75,16 @@ def setup(bot):
       return
     json = response.json()
 
+    to_remove = []
     for i, video in enumerate(videos):
-      try:
-        video.time = datetime.fromisoformat(json['items'][i]['liveStreamingDetails']['scheduledStartTime'])
-        video.is_livestream = True
-      except KeyError:
-        pass
+      if 'liveStreamingDetails' in json['items'][i]:
+        try:
+          video.time = datetime.fromisoformat(json['items'][i]['liveStreamingDetails']['scheduledStartTime'])
+          video.is_livestream = True
+        except KeyError:
+          to_remove.append(video)
+    for video in to_remove:
+      videos.remove(video)
 
     return videos
 
