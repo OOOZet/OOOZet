@@ -158,3 +158,5 @@ def hybrid_check(pred):
     else:
       return discord.app_commands.check(our_pred)(arg)
   return decorator_or_pred
+
+discord.User.our_name = discord.Member.our_name = property(fget=lambda self: self.name + ('#' + self.discriminator if self.discriminator != '0' else ''))

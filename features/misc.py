@@ -72,10 +72,10 @@ def setup(_bot):
     logging.info(f'User {member.id} left the guild')
     if member.guild.system_channel_flags.join_notifications:
       announcement = random.choice([
-        f'Niestety nie ma już {member.mention} z nami… 🕯️',
-        f'Chwila ciszy dla {member.mention}… 🕯️',
-        f'{member.mention} już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
-        f'{member.mention} wyszedł z serwera… 🕯️',
+        f'Niestety nie ma już `{member.our_name}` z nami… 🕯️',
+        f'Chwila ciszy dla `{member.our_name}`… 🕯️',
+        f'`{member.our_name}` już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
+        f'`{member.our_name}` wyszedł z serwera… 🕯️',
       ])
       await member.guild.system_channel.send(announcement)
 

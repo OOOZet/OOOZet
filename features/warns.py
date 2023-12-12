@@ -86,7 +86,7 @@ def setup(_bot):
       await warn(interaction2, member, text_input.value)
 
     text_input = discord.ui.TextInput(label='Powód')
-    modal = discord.ui.Modal(title=f'Zwarnuj {member.name}')
+    modal = discord.ui.Modal(title=f'Zwarnuj {member.our_name}')
     modal.on_submit = on_submit
     modal.add_item(text_input)
     await interaction.response.send_modal(modal)
