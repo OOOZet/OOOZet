@@ -71,7 +71,7 @@ def setup(bot):
     fragment = []
     for line in string.splitlines():
       line = line or '_ _'
-      if line == '_ _' and fragment and fragment[-1] != '_ _':
+      if (line == '_ _' or line.startswith('#')) and fragment and fragment[-1] != '_ _':
         yield '\n'.join(fragment)
         fragment = []
       fragment.append(line)

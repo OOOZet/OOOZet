@@ -52,12 +52,6 @@ def describe(sugestia):
   text = debacktick(sugestia['text'])
   result = f'Sugestia {msg} z dnia {vote_start} ma następującą treść:```\n{text}```'
 
-  if 'annulled' in sugestia:
-    time = mention_datetime(sugestia['annulled']['time'])
-    reason = debacktick(sugestia['annulled']['reason'])
-    result += f'Sugestia **została unieważniona** {time} z powodu `{reason}`. 🚯\n'
-    return result
-
   vote_end = mention_datetime(sugestia['vote_end'])
   if 'outcome' in sugestia:
     result += f'Głosowanie zakończyło się {vote_end} wynikiem '
@@ -65,6 +59,8 @@ def describe(sugestia):
       result += '**pozytywnym**. ✅\n'
     else:
       result += '**negatywnym**. ❌\n'
+  elif 'annulled' in sugestia:
+    result += f'Głosowanie miało skończyć się {vote_end}.\n'
   else:
     result += f'**Głosowanie jeszcze trwa** i skończy się {vote_end}. ❔\n'
 
@@ -86,7 +82,11 @@ def describe(sugestia):
   else:
     result += '- **Nikt** nie głosował **przeciw**.\n'
 
-  if sugestia.get('outcome', False):
+  if 'annulled' in sugestia:
+    time = mention_datetime(sugestia['annulled']['time'])
+    reason = debacktick(sugestia['annulled']['reason'])
+    result += f'Sugestia **została unieważniona** {time} z powodu `{reason}`. 🚯\n'
+  elif sugestia.get('outcome', False):
     if 'done' in sugestia:
       time = mention_datetime(sugestia['done']['time'])
       changes = debacktick(sugestia['done']['changes'])
@@ -205,7 +205,7 @@ async def clean():
       if config['sugestie_ping_role'] is not None:
         await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')
 
-      logging.info(f'Creating sugestia {my_msg.id}')
+      logging.info(f'{msg.author.id} created sugestia {my_msg.id}')
       sugestia = {
         'id': my_msg.id,
         'channel': my_msg.channel.id,
@@ -335,6 +335,8 @@ def setup(_bot):
       msg = mention_message(bot, sugestia['channel'], sugestia['id'])
       await interaction.edit_original_response(content=f'Pomyślnie unieważniono sugestię {msg} z powodu `{debacktick(reason)}`. 🙄', view=None)
       await interaction2.response.defer()
+
+      await update(sugestia)
 
     select, view = select_view(callback, interaction.user)
     for sugestia in filter(is_annullable, database.data['sugestie']):

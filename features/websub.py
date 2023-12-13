@@ -70,6 +70,7 @@ class Server(http.server.HTTPServer):
     future = Future()
 
     def try_sub():
+      self.verification_event.clear()
       for attempt in itertools.count():
         verb = 'subscribe' if self.should_be_subbed else 'unsubscribe'
         gerund = verb.replace('e', 'ing')
