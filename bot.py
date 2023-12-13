@@ -22,17 +22,6 @@ from features import about_me, counting, misc, reminders, rules, sugestie, utils
 
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
-    @self.tree.error
-    async def on_error(interaction, error):
-      logging.exception(f'Got exception in app command {repr(interaction.command.name)}')
-
-      send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
-      emoji = random.choice(['😖', '🫠', '😵', '😵‍💫', '🥴'])
-      if config['server_maintainer'] is None:
-        await send(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}', ephemeral=True)
-      else:
-        await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True)
-
     about_me.setup(self)
     counting.setup(self)
     misc.setup(self)
@@ -51,6 +40,41 @@ class Client(discord.ext.commands.Bot):
     intents.message_content = True
     intents.members = True
     super().__init__('This parameter is irrelevant for us but we still have to put something here.', intents=intents)
+
+    self.check_failure_handlers = []
+
+    @self.tree.error
+    async def on_tree_error(interaction, error):
+      await self.handle_error(interaction, error, f'Got exception in app command {repr(interaction.command.name)}')
+    bot = self
+    async def on_view_error(self, interaction, error, item):
+      await bot.handle_error(interaction, error, f'Got exception in view {repr(self)} for item {repr(item)}')
+    async def on_modal_error(self, interaction, error):
+      await bot.handle_error(interaction, error, f'Got exception in modal {repr(self)}')
+    discord.ui.View.on_error = on_view_error
+    discord.ui.Modal.on_error = on_modal_error
+
+  def on_check_failure(self, handler):
+    self.check_failure_handlers.append(handler)
+
+  async def handle_error(self, interaction, error, log_msg):
+    if isinstance(error, discord.app_commands.CheckFailure):
+      for handler in self.check_failure_handlers:
+        try:
+          await handler(interaction, error)
+          return
+        except Exception as new_error:
+          if new_error is not error:
+            logging.exception(f'Got exception in check failure handler from {repr(handler.__module__)}')
+
+    logging.exception(log_msg)
+
+    send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
+    emoji = random.choice(['😖', '🫠', '😵', '😵‍💫', '🥴'])
+    if config['server_maintainer'] is None:
+      await send(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}', ephemeral=True)
+    else:
+      await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True)
 
   async def on_ready(self):
     logging.info(f'Logged in as {repr(str(self.user))}')

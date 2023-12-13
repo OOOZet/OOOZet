@@ -50,13 +50,12 @@ def setup(_bot):
   global bot
   bot = _bot
 
-  pass_error_on = bot.tree.on_error
-  @bot.tree.error
-  async def on_error(interaction, error):
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
     if isinstance(error, NoWarnsError):
       await interaction.response.send_message(f'{error.user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
     else:
-      await pass_error_on(interaction, error)
+      raise
 
   async def warn(interaction, member, reason):
     logging.info(f'Adding warn for {member.id} with reason {repr(reason)}')

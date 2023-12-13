@@ -33,10 +33,9 @@ def check_staff(action): # "… uprawnień do {action}, …"
   return pred
 
 def setup(bot):
-  pass_error_on = bot.tree.on_error
-  @bot.tree.error
-  async def on_error(interaction, error):
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
     if isinstance(error, NotStaffError):
       await interaction.response.send_message(f'Nie masz uprawnień do {error.action}, tylko administracja może to robić. 😡', ephemeral=True)
     else:
-      await pass_error_on(interaction, error)
+      raise

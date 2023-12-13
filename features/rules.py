@@ -31,13 +31,12 @@ def check_rules(interaction):
     raise NoRulesError()
 
 def setup(bot):
-  pass_error_on = bot.tree.on_error
-  @bot.tree.error
-  async def on_error(interaction, error):
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
     if isinstance(error, NoRulesError):
       await interaction.response.send_message(f'Nie został jeszcze ustanowiony żaden regulamin… 🤨', ephemeral=True)
     else:
-      await pass_error_on(interaction, error)
+      raise
 
   rules = discord.app_commands.Group(name='rules', description='Komendy do regulaminu', guild_ids=[config['guild']])
   bot.tree.add_command(rules)
@@ -56,10 +55,10 @@ def setup(bot):
   @check_rules
   async def history(interaction):
     async def callback(interaction2, choice):
-      result = find(int(choice), database.data['rules'], proj=id)['text'] + '\n'
+      result = find(int(choice), database.data['rules'], proj=id)
       await interaction2.response.send_message(
         f'Załączam regulamin z dnia {mention_datetime(result["time"])}. 😉',
-        file=discord.File(StringIO(result), 'rules.md'),
+        file=discord.File(StringIO(result['text'] + '\n'), 'rules.md'),
         ephemeral=True,
       )
 

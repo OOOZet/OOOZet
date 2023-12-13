@@ -132,14 +132,14 @@ async def update(sugestia):
           database.should_save = True
 
         if is_change_of_mind:
-          logging.info(f'{user} has changed their vote for sugestia {sugestia["id"]} to {repr(choice)}')
+          logging.info(f'{user} has changed their vote to {repr(choice)} on sugestia {sugestia["id"]}')
           replies = {
             'for': 'Pomyślnie zmieniono głos na za sugestią. 🫡',
             'abstain': 'Pomyślnie zmieniono głos na wstrzymanie się od głosu. 🫡',
             'against': 'Pomyślnie zmieniono głos na przeciw sugestii. 🫡',
           }
         else:
-          logging.info(f'{user} has cast a {repr(choice)} vote for sugestia {sugestia["id"]}')
+          logging.info(f'{user} has voted {repr(choice)} on sugestia {sugestia["id"]}')
           replies = {
             'for': 'Pomyślnie zagłosowano za sugestią. 🫡',
             'abstain': 'Pomyślnie wstrzymano się od głosu. 🫡',
@@ -228,15 +228,14 @@ def setup(_bot):
   global bot
   bot = _bot
 
-  pass_error_on = bot.tree.on_error
-  @bot.tree.error
-  async def on_error(interaction, error):
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
     if isinstance(error, NoSugestieError):
       await interaction.response.send_message('Nie zostały jeszcze przedłożone żadne sugestie… 🤨', ephemeral=True)
     elif isinstance(error, NoPendingSugestieError):
       await interaction.response.send_message('Nie ma żadnych sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
     else:
-      await pass_error_on(interaction, error)
+      raise
 
   @discord.ext.tasks.loop(seconds=parse_duration(config['sugestie_autoupdate']))
   async def loop():

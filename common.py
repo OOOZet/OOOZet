@@ -48,7 +48,7 @@ config = {
   'sugestie_channel': None,                  # Kanal "#sugestie"
   'sugestie_vote_role': None,                # Rola, która może głosować nad sugestiami
   'sugestie_ping_role': None,                # Rola, która jest pingowana, gdy pojawia się nowa sugestia
-  'sugestie_vote_length': '24h',             # Czas na głosowanie nad sugestią
+  'sugestie_vote_length': '1d',              # Czas na głosowanie nad sugestią
   'sugestie_deciding_lead': None,            # Przewaga, po której jedna z opcji wygrywa
   'sugestie_autoupdate': '1h',               # Regularny odstęp czasu, w którym trwające sugestie są automatycznie aktualizowane
 

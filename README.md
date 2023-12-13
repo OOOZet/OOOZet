@@ -16,7 +16,7 @@ Domyślnie bot będzie zapisywał swoje dane w `database.json`, a jego konsola b
 ## Kontrybuowanie
 
 W głównym folderze znajduje się szkielet bota, który raczej nie będziesz musiał modyfikować w bliżej nieokreślony sposób:
-- [`bot.py`](bot.py) - Odpalanie instancji bota. Jedyne miejsce warte uwagi w tym pliku to [`setup_hook`](bot.py#L36), w którym inicjalizujesz swoje feature'y.
+- [`bot.py`](bot.py) - Odpalanie instancji bota. Jedyne miejsce warte uwagi w tym pliku to [`setup_hook`](bot.py#L25), w którym inicjalizujesz swoje feature'y.
 - [`common.py`](common.py) - Plik zawierający domyślny i w trakcie wykonywania załadowany `config` oraz wiele różnych narzędzi, z którymi warto się zapoznać, żeby nie pisać tego samego drugi raz. Może się zdarzyć, że w przyszłości sam dodasz coś od siebie do tej kolekcji. Jest tutaj też funkcja `redacted_config` zwracająca konfigurację oczyszczoną z wrażliwych danych, która może być później wysyłana w świat.
 - [`console.py`](console.py) - Tekstowa konsola na jednym z portów TCP w pewien sposób ułatwiająca zarządzanie botem. Jedyne, co potrzebujesz do tworzenia własnych komend, to `console.begin(…)`, `console.register(…)` i `console.end()`.
 - [`database.py`](database.py) - Moduł zajmujący się trzymaniem w pamięci, ładowaniem i zapisywaniem pliku JSON zwanego "bazą danych". Jedyne dwie rzeczy, które będziesz potrzebować stąd, to `database.data` i `database.should_save = True`. Typy `set` i `datetime` są automatycznie konwertowane z i na JSON podczas ładowania i zapisywania, więc w `database.data` trzymaj je w ich oryginalnej postaci. To samo dotyczy kluczy typu `int` w słownikach.

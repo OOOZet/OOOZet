@@ -38,13 +38,12 @@ def setup(_bot):
   global bot
   bot = _bot
 
-  pass_error_on = bot.tree.on_error
-  @bot.tree.error
-  async def on_error(interaction, error):
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
     if isinstance(error, NoStaffError):
       await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨', ephemeral=True)
     else:
-      await pass_error_on(interaction, error)
+      raise
 
   @bot.tree.context_menu(name='Odśwież role')
   @discord.app_commands.guilds(config['guild'])
