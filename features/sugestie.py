@@ -47,39 +47,39 @@ def describe(sugestia):
 
   vote_end = mention_datetime(sugestia['vote_end'])
   if sugestia['did_pass'] is None:
-    result += f'Głosowanie jeszcze trwa i skończy się {vote_end}. ❔\n'
+    result += f'**Głosowanie jeszcze trwa** i skończy się {vote_end}. ❔\n'
   else:
     result += f'Głosowanie zakończyło się {vote_end} wynikiem '
     if sugestia['did_pass']:
-      result += 'pozytywnym. ✅\n'
+      result += '**pozytywnym**. ✅\n'
     else:
-      result += 'negatywnym. ❌\n'
+      result += '**negatywnym**. ❌\n'
 
   if sugestia['for']:
     voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
-    result += f'- Głosowali za: {voters}\n'
+    result += f'- Głosowali **za**: {voters}\n'
   else:
-    result += '- Nikt nie głosował za.\n'
+    result += '- **Nikt** nie głosował **za**.\n'
 
   if sugestia['abstain']:
     voters = ', '.join(f'<@{i}>' for i in sugestia['abstain'])
-    result += f'- Wstrzymali się od głosu: {voters}\n'
+    result += f'- **Wstrzymali się** od głosu: {voters}\n'
   else:
-    result += '- Nikt nie wstrzymał się od głosu.\n'
+    result += '- **Nikt** nie **wstrzymał się** od głosu.\n'
 
   if sugestia['against']:
     voters = ', '.join(f'<@{i}>' for i in sugestia['against'])
-    result += f'- Głosowali przeciw: {voters}\n'
+    result += f'- Głosowali **przeciw**: {voters}\n'
   else:
-    result += '- Nikt nie głosował przeciw.\n'
+    result += '- **Nikt** nie głosował **przeciw**.\n'
 
   if sugestia['did_pass'] is True:
     if sugestia['done'] is None:
-      result += 'Sugestia nie została jeszcze wykonana przez administrację. ❓\n'
+      result += 'Sugestia **nie została jeszcze wykonana** przez administrację. ❓\n'
     else:
       done = mention_datetime(sugestia['done'])
       changes = debacktick(sugestia['changes'])
-      result += f'Sugestia została wykonana {done} z opisem zmian: `{changes}` ✅\n'
+      result += f'Sugestia **została wykonana** {done} z opisem zmian `{changes}` ✅\n'
 
   return result
 
@@ -134,16 +134,16 @@ async def update(sugestia):
         if is_change_of_mind:
           logging.info(f'{user} has changed their vote to {repr(choice)} on sugestia {sugestia["id"]}')
           replies = {
-            'for': 'Pomyślnie zmieniono głos na za sugestią. 🫡',
-            'abstain': 'Pomyślnie zmieniono głos na wstrzymanie się od głosu. 🫡',
-            'against': 'Pomyślnie zmieniono głos na przeciw sugestii. 🫡',
+            'for': 'Pomyślnie zmieniono głos na **za** sugestią. 🫡',
+            'abstain': 'Pomyślnie zmieniono głos na **wstrzymanie się** od głosu. 🫡',
+            'against': 'Pomyślnie zmieniono głos na **przeciw** sugestii. 🫡',
           }
         else:
           logging.info(f'{user} has voted {repr(choice)} on sugestia {sugestia["id"]}')
           replies = {
-            'for': 'Pomyślnie zagłosowano za sugestią. 🫡',
-            'abstain': 'Pomyślnie wstrzymano się od głosu. 🫡',
-            'against': 'Pomyślnie zagłosowano przeciw sugestii. 🫡',
+            'for': 'Pomyślnie zagłosowano **za** sugestią. 🫡',
+            'abstain': 'Pomyślnie **wstrzymano się** od głosu. 🫡',
+            'against': 'Pomyślnie zagłosowano **przeciw** sugestii. 🫡',
           }
         await interaction.response.send_message(replies[choice], ephemeral=True)
 
@@ -182,7 +182,7 @@ async def clean():
         continue
 
       embed = discord.Embed(title='Sugestia', description=msg.content)
-      embed.set_footer(text=msg.author.name, icon_url=msg.author.display_avatar.url)
+      embed.set_footer(text=msg.author.our_name, icon_url=msg.author.display_avatar.url)
       my_msg = await msg.channel.send(embed=embed)
       if config['sugestie_ping_role'] is not None:
         await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')
@@ -245,7 +245,6 @@ def setup(_bot):
   @bot.listen()
   async def on_ready():
     loop.start()
-    await update_ongoing()
     logging.info('Cleaning #sugestie')
     await clean()
     logging.info('Sugestie is ready')

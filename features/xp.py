@@ -85,10 +85,10 @@ def setup(_bot):
 
       if config['xp_channel'] is not None:
         announcement = random.choice([
-          f'{member.mention} nie ma życia i dzięki temu jest już na poziomie {level}! 🥳',
-          f'{member.mention} właśnie wszedł na wyższy poziom {level}! 🥳',
-          f'{member.mention} zdobył kolejny poziom {level}. Brawo! 🥳',
-          f'{member.mention} zdobył kolejny poziom {level}. Moje kondolencje. 🥳',
+          f'{member.mention} nie ma życia i dzięki temu jest już na poziomie **{level}**! 🥳',
+          f'{member.mention} właśnie wszedł na wyższy poziom **{level}**! 🥳',
+          f'{member.mention} zdobył kolejny poziom **{level}**. Brawo! 🥳',
+          f'{member.mention} zdobył kolejny poziom **{level}**. Moje kondolencje. 🥳',
         ])
         await bot.get_channel(config['xp_channel']).send(announcement)
 
@@ -101,9 +101,9 @@ def setup(_bot):
     if user.bot:
       await interaction.response.send_message(f'{user.mention} jest botem i nie może zbierać XP… 😐', ephemeral=True)
     elif user == interaction.user:
-      await interaction.response.send_message(f'Masz {user.xp} XP i tym samym poziom {level}. Do następnego brakuje ci jeszcze {left} XP. 📈', ephemeral=True)
+      await interaction.response.send_message(f'Masz **{user.xp} XP** i tym samym **poziom {level}**. Do następnego brakuje ci jeszcze **{left} XP**. 📈', ephemeral=True)
     else:
-      await interaction.response.send_message(f'{user.mention} ma {user.xp} XP i tym samym poziom {level}. Do następnego brakuje mu/jej jeszcze {left} XP. 📈', ephemeral=True)
+      await interaction.response.send_message(f'{user.mention} ma **{user.xp} XP** i tym samym **poziom {level}**. Do następnego brakuje mu/jej jeszcze **{left} XP**. 📈', ephemeral=True)
 
   @xp.command(name='show', description='Pokazuje XP użytkownika')
   async def cmd_show(interaction, user: discord.User | None):
@@ -123,7 +123,7 @@ def setup(_bot):
     ranking = sorted(database.data['xp'].items(), key=lambda x: x[1], reverse=True)[:10]
     for i, entry in enumerate(ranking):
       user, xp = entry
-      result += f'{i + 1}. <@{user}> z {xp} XP i poziomem {xp_to_level(xp)}\n'
+      result += f'{i + 1}. <@{user}> z **{xp} XP** i poziomem **{xp_to_level(xp)}**\n'
     await interaction.response.send_message(result, ephemeral=True)
 
   @xp.command(description='Wyświetla role za XP')
@@ -134,7 +134,7 @@ def setup(_bot):
 
     result = 'Za zdobywanie kolejnych poziomów możesz dostać następujące role: 💰\n'
     for level, role in config['xp_roles']:
-      result += f'- <@&{role}> za poziom {level}\n'
+      result += f'- <@&{role}> za poziom **{level}**\n'
     await interaction.response.send_message(result, ephemeral=True)
 
 console.begin('xp')

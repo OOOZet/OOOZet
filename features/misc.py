@@ -87,7 +87,7 @@ def setup(_bot):
     if 'alarm_last' in database.data:
       cooldown = parse_duration(config['alarm_cooldown'])
       if (now - database.data['alarm_last']).total_seconds() < cooldown:
-        await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich {cooldown} sekund. ⏱️', ephemeral=True)
+        await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich **{cooldown}** sekund. ⏱️', ephemeral=True)
         return
 
     logging.info(f'{interaction.user.id} has raised the alarm!')
@@ -100,7 +100,7 @@ def setup(_bot):
     await interaction.response.send_message(f'{mentions} Potrzebna natychmiastowa interwencja!!! {emoji}')
     for user in staff:
       guild = bot.get_guild(config['guild'])
-      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {guild}!!! {emoji}')
+      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na **{guild}**!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
 
   @bot.tree.command(description='Wyświetla skład administracji')

@@ -49,9 +49,9 @@ def setup(bot):
 
     mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
     if video.is_livestream:
-      announcement = f'{mention} Na kanale OKI właśnie zaczyna się transmisja na żywo [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} Na kanale OKI właśnie zaczyna się transmisja na żywo: [{video.title}]({video.link})! 🔔'
     else:
-      announcement = f'{mention} Na kanale OKI został opublikowany nowy film [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.title}]({video.link})! 🔔'
     await bot.get_channel(config['oki_channel']).send(announcement)
 
   def parse_youtube_feed(content):
@@ -130,7 +130,7 @@ def setup(bot):
 
     @property
     def is_niche(self):
-      return all(i not in self.name for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4'])
+      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4'])
 
   async def remind_codeforces(contest, delay=0):
     if delay > 0:
@@ -146,7 +146,7 @@ def setup(bot):
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔')
+    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
 
   codeforces_reminders = []
 

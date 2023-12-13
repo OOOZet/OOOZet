@@ -118,7 +118,7 @@ def setup(bot):
       return
 
     if sum(map(sugestie.is_pending, database.data.get('sugestie', []))) < ile_sugestii:
-      await interaction.response.send_message(f'Nie ma co najmniej {ile_sugestii} sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
+      await interaction.response.send_message(f'Nie ma co najmniej **{ile_sugestii}** sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
       return
 
     async def on_submit(interaction2):
