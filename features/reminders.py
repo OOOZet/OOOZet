@@ -44,6 +44,8 @@ def setup(bot):
       await asyncio.sleep(delay)
       logging.info(f'Reminding about YouTube livestream {video.id}')
 
+    await bot.wait_until_ready()
+
     if config['oki_channel'] is None:
       return
 
@@ -104,8 +106,7 @@ def setup(bot):
           database.data['oki_last_published'] = max(database.data['oki_last_published'], video.time)
           database.should_save = True
 
-  @bot.listen()
-  async def on_ready(): # TODO: gets called twice on internet disconnect
+  try:
     logging.info("Downloading OKI's YouTube channel feed")
     response = requests.get(
       f'https://www.youtube.com/feeds/videos.xml?channel_id={config["oki_youtube"]}',
@@ -114,6 +115,8 @@ def setup(bot):
     response.raise_for_status()
     process_youtube_feed(response.text)
     logging.info("Processed OKI's YouTube channel feed")
+  except Exception as e:
+    logging.exception('Got exception while downloading YouTube channel feed')
 
   websub.on_msg = process_youtube_feed
 

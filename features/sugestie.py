@@ -269,9 +269,9 @@ def setup(_bot):
 
   @bot.listen()
   async def on_ready():
-    loop.start()
     logging.info('Cleaning #sugestie')
     await clean()
+    loop.start()
     logging.info('Sugestie is ready')
 
   @bot.listen()
