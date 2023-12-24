@@ -82,7 +82,7 @@ def setup(bot):
     if not interaction.response.is_done():
       await interaction.response.defer(ephemeral=True)
 
-    assert(interaction.guild.id == config['guild'])
+    assert interaction.guild.id == config['guild']
     channel = interaction.guild.rules_channel
     if channel is None:
       await interaction.followup.send('Nie został jeszcze ustawiony żaden kanał z zasadami… 🤨', ephemeral=True)

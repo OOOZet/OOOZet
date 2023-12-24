@@ -105,7 +105,7 @@ def setup(bot):
           database.should_save = True
 
   @bot.listen()
-  async def on_ready():
+  async def on_ready(): # TODO: gets called twice on internet disconnect
     logging.info("Downloading OKI's YouTube channel feed")
     response = requests.get(
       f'https://www.youtube.com/feeds/videos.xml?channel_id={config["oki_youtube"]}',
@@ -142,7 +142,7 @@ def setup(bot):
       return
 
     if not contest.is_niche and config['codeforces_role'] is not None:
-      mention = f'<@&{config["codeforces_role"]}>'
+      mention = f'<@&{config["codeforces_role"]}>' # TODO: seperate roles for div1, div2 etc
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)

@@ -117,7 +117,7 @@ def parse_duration(string):
   return result
 
 def format_datetime(datetime):
-  return datetime.strftime(f'%-d %B %Y %H:%M') # %-d is not portable.
+  return datetime.strftime('%-d %B %Y %H:%M') # %-d is not portable.
 
 def mention_datetime(datetime, *, relative=False):
   timestamp = int(datetime.timestamp())

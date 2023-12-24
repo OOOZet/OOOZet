@@ -40,7 +40,7 @@ def level_to_xp(level):
 
 async def update_roles_for(member):
   logging.info(f'Updating XP roles for {member.id}')
-  assert(member.guild.id == config['guild'])
+  assert member.guild.id == config['guild']
   level = xp_to_level(member.xp)
   for threshold, role in config['xp_roles']:
     role = member.guild.get_role(role)
@@ -84,11 +84,12 @@ def setup(_bot):
       await update_roles_for(member)
 
       if config['xp_channel'] is not None:
+        emoji = random.choice(['🥳', '🎉', '🎊'])
         announcement = random.choice([
-          f'{member.mention} nie ma życia i dzięki temu jest już na poziomie **{level}**! 🥳',
-          f'{member.mention} właśnie wszedł na wyższy poziom **{level}**! 🥳',
-          f'{member.mention} zdobył kolejny poziom **{level}**. Brawo! 🥳',
-          f'{member.mention} zdobył kolejny poziom **{level}**. Moje kondolencje. 🥳',
+          f'{member.mention} nie ma życia i dzięki temu jest już na poziomie **{level}**! {emoji}',
+          f'{member.mention} właśnie wszedł na wyższy poziom **{level}**! {emoji}',
+          f'{member.mention} zdobył kolejny poziom **{level}**. Brawo! {emoji}',
+          f'{member.mention} zdobył kolejny poziom **{level}**. Moje kondolencje. {emoji}',
         ])
         await bot.get_channel(config['xp_channel']).send(announcement)
 
