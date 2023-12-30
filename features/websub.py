@@ -100,7 +100,7 @@ class Server(http.server.HTTPServer):
           logging.exception(f'Got exception while {gerund} WebSub server' + retrying)
         else:
           if response.status_code != 202:
-            logging.error(f'WebSub {noun} request failed with {response.status_code}: {repr(response.text)}' + retrying)
+            logging.error(f'WebSub {noun} request failed with {response.status_code}: {response.text!r}' + retrying)
           elif not self.verification_event.wait(timeout):
             logging.error(f'Timed out after {timeout} seconds while waiting for WebSub {noun} verification request' + retrying)
           else:
@@ -180,7 +180,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
       logging.info('Received WebSub message')
 
     if algorithm not in {'sha1', 'sha256', 'sha384', 'sha512'}: # New algorithms may be added in the future.
-      logging.warn(f'Unknown WebSub signature algorithm: {repr(algorithm)}')
+      logging.warn(f'Unknown WebSub signature algorithm: {algorithm!r}')
       self.send_error(501)
       return
 
@@ -194,7 +194,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
     try:
       content_length = int(content_length)
     except ValueError:
-      logging.info(f'WebSub message has malformed Content-Length: {repr(content_length)}')
+      logging.info(f'WebSub message has malformed Content-Length: {content_length!r}')
       self.send_error(400)
       return
 
@@ -217,7 +217,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
       on_msg(content.decode())
 
   def log_message(self, format, *args): # The person who came up with this is insane.
-    logging.info(f'WebSub server says {repr(format % args)}')
+    logging.info(f'WebSub server says {format % args!r}')
 
 console.begin('websub')
 console.register('start',       None, 'starts the WebSub server',       start)

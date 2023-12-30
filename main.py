@@ -31,9 +31,9 @@ if __name__ == '__main__':
         i += 1
         options['config'] = args[i]
       except IndexError:
-        raise Exception(f'Expected a path to config after {repr(args[i - 1])}')
+        raise Exception(f'Expected a path to config after {args[i - 1]!r}')
     else:
-      raise Exception(f'Unknown option: {repr(args[i])}')
+      raise Exception(f'Unknown option: {args[i]!r}')
     i += 1
 
   discord.utils.setup_logging()

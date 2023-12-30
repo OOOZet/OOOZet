@@ -142,14 +142,14 @@ async def update(sugestia):
         database.should_save = True
 
       if is_change_of_mind:
-        logging.info(f'{user} has changed their vote to {repr(choice)} on sugestia {sugestia["id"]}')
+        logging.info(f'{user} has changed their vote to {choice!r} on sugestia {sugestia["id"]}')
         replies = {
           'for': 'Pomyślnie zmieniono głos na **za** sugestią. 🫡',
           'abstain': 'Pomyślnie zmieniono głos na **wstrzymanie się** od głosu. 🫡',
           'against': 'Pomyślnie zmieniono głos na **przeciw** sugestii. 🫡',
         }
       else:
-        logging.info(f'{user} has voted {repr(choice)} on sugestia {sugestia["id"]}')
+        logging.info(f'{user} has voted {choice!r} on sugestia {sugestia["id"]}')
         replies = {
           'for': 'Pomyślnie zagłosowano **za** sugestią. 🫡',
           'abstain': 'Pomyślnie **wstrzymano się** od głosu. 🫡',

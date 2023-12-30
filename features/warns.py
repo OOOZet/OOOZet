@@ -58,7 +58,7 @@ def setup(_bot):
       raise
 
   async def warn(interaction, member, reason):
-    logging.info(f'Adding warn for {member.id} with reason {repr(reason)}')
+    logging.info(f'Adding warn for {member.id} with reason {reason!r}')
     warn = {
       'time': datetime.now().astimezone(),
       'reason': reason,
@@ -96,7 +96,7 @@ def setup(_bot):
     async def callback(interaction2, choice):
       warn = find(int(choice), database.data['warns'][member.id], proj=id)
 
-      logging.info(f'Removing warn for {member.id} with reason {repr(warn["reason"])} from {warn["time"]}')
+      logging.info(f'Removing warn for {member.id} with reason {warn["reason"]!r} from {warn["time"]}')
       database.data['warns'][member.id].remove(warn)
       database.should_save = True
       await update_roles_for(member)

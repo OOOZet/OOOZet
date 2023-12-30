@@ -54,7 +54,7 @@ config = {
 
   'websub_host': None,                       # Adres tego serwera
   'websub_port': 13579,                      # Port, na którym będzie odpalony serwer WebSub
-  'websub_lease_time': '1d',                 # Domyślny czas ważności subskrypcji WebSub
+  'websub_lease_time': '7d',                 # Domyślny czas ważności subskrypcji WebSub
   'websub_sub_retries': [                    # Opóźnienia kolejnych prób zasubskrybowania
     '5s', '15s', '30s', '1m',
     '5m', '15m', '30m', '1h'
@@ -85,7 +85,7 @@ def load_config():
       global config
       config |= json.load(file)
   except FileNotFoundError:
-    raise Exception(f'Config not found: {repr(options["config"])}')
+    raise Exception(f'Config not found: {options["config"]!r}')
 
 def save_config():
   logging.info('Saving config')
@@ -113,7 +113,7 @@ def parse_duration(string):
         result += units['s'] * (float(value) if '.' in value else int(value))
         value = ''
     else:
-      raise Exception(f'Invalid duration: {repr(string)}')
+      raise Exception(f'Invalid duration: {string!r}')
   return result
 
 def format_datetime(datetime):

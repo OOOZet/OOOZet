@@ -73,7 +73,7 @@ def setup(bot):
       timeout=parse_duration(config['youtube_timeout']),
     )
     if not response.ok:
-      logging.error(f'YouTube API request failed with {response.status_code}: {repr(response.text)}')
+      logging.error(f'YouTube API request failed with {response.status_code}: {response.text!r}')
       return
     json = response.json()
 
@@ -133,7 +133,7 @@ def setup(bot):
 
     @property
     def is_niche(self):
-      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4'])
+      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4', 'Hello', 'Good Bye'])
 
   async def remind_codeforces(contest, delay=0):
     if delay > 0:
@@ -161,7 +161,7 @@ def setup(bot):
     response.raise_for_status()
     json = response.json()
     if json['status'] != 'OK':
-      logging.error(f'Codeforces contest schedule request failed: {repr(json["comment"])}')
+      logging.error(f'Codeforces contest schedule request failed: {json["comment"]!r}')
       return
 
     for task in codeforces_reminders:

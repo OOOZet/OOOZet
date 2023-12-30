@@ -121,7 +121,7 @@ def listen():
         client.send(''.join(traceback.format_exception(None, e, e.__traceback__)).encode())
         continue
 
-      logging.info(f'Console received command {repr(line)}')
+      logging.info(f'Console received command {line!r}')
 
       try:
         reply = run(line)
@@ -175,10 +175,10 @@ def run(cmd):
       if op.params is not None:
         return op.func(arg)
       elif arg:
-        raise Exception(f'Operation {repr(name)} expects no arguments')
+        raise Exception(f'Operation {name!r} expects no arguments')
       else:
         return op.func()
-  raise Exception(f'Unknown operation: {repr(name)}')
+  raise Exception(f'Unknown operation: {name!r}')
 
 scope = []
 

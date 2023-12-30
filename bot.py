@@ -45,12 +45,12 @@ class Client(discord.ext.commands.Bot):
 
     @self.tree.error
     async def on_tree_error(interaction, error):
-      await self.handle_error(interaction, error, f'Got exception in app command {repr(interaction.command.name)}')
+      await self.handle_error(interaction, error, f'Got exception in app command {interaction.command.name!r}')
     bot = self
     async def on_view_error(self, interaction, error, item):
-      await bot.handle_error(interaction, error, f'Got exception in view {repr(self)} for item {repr(item)}')
+      await bot.handle_error(interaction, error, f'Got exception in view {self!r} for item {item!r}')
     async def on_modal_error(self, interaction, error):
-      await bot.handle_error(interaction, error, f'Got exception in modal {repr(self)}')
+      await bot.handle_error(interaction, error, f'Got exception in modal {self!r}')
     discord.ui.View.on_error = on_view_error
     discord.ui.Modal.on_error = on_modal_error
 
@@ -65,7 +65,7 @@ class Client(discord.ext.commands.Bot):
           return
         except Exception as new_error:
           if new_error is not error:
-            logging.exception(f'Got exception in check failure handler from {repr(handler.__module__)}')
+            logging.exception(f'Got exception in check failure handler from {handler.__module__!r}')
 
     logging.exception(log_msg)
 
@@ -77,7 +77,7 @@ class Client(discord.ext.commands.Bot):
       await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True)
 
   async def on_ready(self):
-    logging.info(f'Logged in as {repr(str(self.user))}')
+    logging.info(f'Logged in as {str(self.user)!r}')
 
 # TODO: egzekwowanie regulaminu
 
