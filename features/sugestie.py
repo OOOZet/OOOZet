@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from enum import auto, Enum
 
 import console, database
-from common import config, debacktick, find, format_datetime, hybrid_check, mention_datetime, mention_message, parse_duration, select_view
+from common import config, debacktick, find, format_datetime, hybrid_check, limit_len, mention_datetime, mention_message, parse_duration, select_view
 from features.utils import check_staff
 
 bot = None
@@ -292,7 +292,7 @@ def setup(_bot):
 
     select, view = select_view(callback, interaction.user)
     for sugestia in database.data['sugestie']:
-      select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
+      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
     await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=view, ephemeral=True)
 
   @sugestie.command(description='Oznacza sugestię jako wykonaną')
@@ -315,7 +315,7 @@ def setup(_bot):
 
     select, view = select_view(callback, interaction.user)
     for sugestia in filter(is_pending, database.data['sugestie']):
-      select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
+      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
     await interaction.response.send_message(f'Którą sugestię chcesz oznaczyć jako wykonaną z opisem zmian `{debacktick(changes)}`?', view=view)
 
   @sugestie.command(description='Unieważnia sugestię')
@@ -340,7 +340,7 @@ def setup(_bot):
 
     select, view = select_view(callback, interaction.user)
     for sugestia in filter(is_annullable, database.data['sugestie']):
-      select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
+      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
     await interaction.response.send_message(f'Którą sugestię chcesz unieważnić z powodu `{debacktick(reason)}`?', view=view)
 
 console.begin('sugestie')

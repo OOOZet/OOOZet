@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import console, database
-from common import config, debacktick, find, format_datetime, mention_datetime, select_view
+from common import config, debacktick, find, format_datetime, limit_len, mention_datetime, select_view
 from features.utils import check_staff
 
 bot = None
@@ -108,7 +108,7 @@ def setup(_bot):
 
     select, view = select_view(callback, interaction.user)
     for warn in database.data['warns'][member.id]:
-      select.add_option(label=warn['reason'], value=id(warn), description=format_datetime(warn['time']))
+      select.add_option(label=limit_len(warn['reason']), value=id(warn), description=format_datetime(warn['time']))
     await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {member.mention}?', view=view)
 
   @bot.tree.command(name='unwarn', description='Odbiera warna użytkownikowi')
