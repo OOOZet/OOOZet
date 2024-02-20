@@ -23,7 +23,7 @@ from common import config, hybrid_check
 class NotStaffError(discord.app_commands.CheckFailure):
   action: str
 
-def check_staff(action): # "… uprawnień do {action}, …"
+def check_staff(action=None): # "… uprawnień do {action}, …"
   @hybrid_check
   def pred(interaction):
     if interaction.guild.id != config['guild']:

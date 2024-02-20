@@ -34,6 +34,9 @@ def is_pending(sugestia):
 def is_annullable(sugestia):
   return 'annulled' not in sugestia and 'done' not in sugestia
 
+def is_eraseable_in(interaction):
+  return lambda sugestia: (sugestia['author'] == interaction.user.id or check_staff()(interaction)) and 'done' not in sugestia
+
 def emoji_status_of(sugestia):
   if 'annulled' in sugestia:
     return '🚯'
@@ -210,6 +213,7 @@ async def clean():
         'id': my_msg.id,
         'channel': my_msg.channel.id,
         'text': msg.content,
+        'author': msg.author.id,
         'for': set(),
         'abstain': set(),
         'against': set(),
@@ -228,6 +232,7 @@ class NoSugestieError(discord.app_commands.CheckFailure):
     Any = auto()
     Pending = auto()
     Annullable = auto()
+    Eraseable = auto()
   filter: Filter
 
 @hybrid_check
@@ -245,6 +250,11 @@ def check_annullable(interaction):
   if not any(map(is_annullable, database.data.get('sugestie', []))):
     raise NoSugestieError(NoSugestieError.Filter.Annullable)
 
+@hybrid_check
+def check_eraseable(interaction):
+  if not any(map(is_eraseable_in(interaction), database.data.get('sugestie', []))):
+    raise NoSugestieError(NoSugestieError.Filter.Eraseable)
+
 def setup(_bot):
   global bot
   bot = _bot
@@ -259,6 +269,8 @@ def setup(_bot):
           await interaction.response.send_message('Nie ma żadnych sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
         case error.Filter.Annullable:
           await interaction.response.send_message('Nie ma żadnych sugestii, które możesz unieważnić… 🤨', ephemeral=True)
+        case error.Filter.Eraseable:
+          await interaction.response.send_message('Nie ma żadnych sugestii, które możesz usunąć… 🤨', ephemeral=True)
     else:
       raise
 
@@ -342,6 +354,23 @@ def setup(_bot):
     for sugestia in filter(is_annullable, database.data['sugestie']):
       select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
     await interaction.response.send_message(f'Którą sugestię chcesz unieważnić z powodu `{debacktick(reason)}`?', view=view)
+
+  @sugestie.command(description='Usuwa pomyłkowo wysłaną sugestię')
+  @check_eraseable
+  async def erase(interaction):
+    async def callback(interaction2, choice):
+      sugestia = find(int(choice), filter(is_eraseable_in(interaction2), database.data['sugestie']), proj=lambda x: x['id'])
+
+      logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
+      database.data['sugestie'].remove(sugestia)
+
+      await interaction.edit_original_response(content=f'Pomyślnie usunięto sugestię o treści `{limit_len(debacktick(sugestia["text"]))}`. 🙄', view=None)
+      await interaction2.response.defer()
+
+    select, view = select_view(callback, interaction.user)
+    for sugestia in filter(is_eraseable_in(interaction), database.data['sugestie']):
+      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
+    await interaction.response.send_message(f'Którą sugestię chcesz usunąć?', view=view)
 
 console.begin('sugestie')
 console.register('update_all', None, 'updates all sugestie', lambda: asyncio.run_coroutine_threadsafe(update_all(), bot.loop).result())
