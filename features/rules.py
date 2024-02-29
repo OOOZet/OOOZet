@@ -101,9 +101,9 @@ def setup(bot):
   async def cmd_resend(interaction):
     await resend(interaction)
 
-  @rules.command(description='Ustanawia nowy regulamin')
+  @rules.command(name='set', description='Ustanawia nowy regulamin')
   @check_staff('ustanawiania nowego regulaminu')
-  async def set(interaction, text: discord.Attachment, ile_sugestii: discord.app_commands.Range[int, 0, 4]): # Max is 4 due to limitation in Discord.
+  async def set_(interaction, text: discord.Attachment, ile_sugestii: discord.app_commands.Range[int, 0, 4]): # Max is 4 due to a limitation in Discord.
     try:
       text = (await text.read()).decode()
       text = '\n'.join(line.rstrip() for line in text.strip().splitlines())
@@ -122,17 +122,12 @@ def setup(bot):
       return
 
     async def on_submit(interaction2):
+      logging.info('Setting new rules')
       rules = {
         'time': interaction2.created_at,
         'text': text,
-        'sugestie': list({int(select.values[0]) for select in view.children[:-1]}) if ile_sugestii > 0 else [],
+        'sugestie': [int(select.values[0]) for select in view.children[:-1]] if ile_sugestii > 0 else [],
       }
-
-      if len(rules['sugestie']) < ile_sugestii:
-        await interaction2.response.send_message('Nie możesz wybrać tej samej sugestii wiele razy… 🤨', ephemeral=True)
-        return
-
-      logging.info('Setting new rules')
       database.data.setdefault('rules', []).append(rules)
       database.should_save = True
 
@@ -147,11 +142,24 @@ def setup(bot):
       await on_submit(interaction)
     else:
       view = discord.ui.View()
+      async def interaction_check(interaction2):
+        return interaction2.user == interaction.user
+      view.interaction_check = interaction_check
 
       for i in range(ile_sugestii):
-        select = discord.ui.Select()
         async def callback(interaction):
           await interaction.response.defer()
+
+          selected_sugestie = set()
+          for select in view.children[:-1]:
+            if select.values:
+              selected_sugestie.add(int(select.values[0]))
+            for option in select.options:
+              option.default = bool(select.values) and int(option.value) == int(select.values[0])
+          submit.disabled = len(selected_sugestie) != ile_sugestii
+          await interaction.edit_original_response(view=view)
+
+        select = discord.ui.Select()
         select.callback = callback
         for sugestia in filter(sugestie.is_pending, database.data['sugestie']):
           select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
@@ -159,6 +167,7 @@ def setup(bot):
 
       submit = discord.ui.Button(style=discord.ButtonStyle.success, label='Zatwierdź')
       submit.callback = on_submit
+      submit.disabled = True
       view.add_item(submit)
 
       await interaction.response.send_message('Z którymi sugestiami jest powiązana ta zmiana regulaminu?', view=view)
