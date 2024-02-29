@@ -42,6 +42,7 @@ config = {
   'xp_max_gain': 40,                         # Maksymalna ilość XP, którą można dostać za jedną wiadomość
   'xp_ignored_channels': [],                 # Kanały, które nie są liczone do XP
   'xp_ignored_categories': [],               # Kategorie kanałów, które nie są liczone do XP
+  'xp_unignored_channels': [],               # Wyjątki do powyższego
   'xp_roles': [],                            # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
   'xp_channel': None,                        # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
 

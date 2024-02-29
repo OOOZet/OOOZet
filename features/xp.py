@@ -63,7 +63,7 @@ def setup(_bot):
   @bot.listen()
   async def on_message(msg):
     member = msg.author
-    if member.bot or msg.guild is None or msg.guild.id != config['guild'] or msg.channel.id in config['xp_ignored_channels'] or msg.channel.category_id in config['xp_ignored_categories']:
+    if member.bot or msg.guild is None or msg.guild.id != config['guild'] or (msg.channel.id not in config['xp_unignored_channels'] and (msg.channel.id in config['xp_ignored_channels'] or msg.channel.category_id in config['xp_ignored_categories'])):
       return
 
     async with lock:
