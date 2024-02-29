@@ -18,7 +18,7 @@ import discord, logging
 from io import StringIO
 
 import database
-from common import config, find, format_datetime, hybrid_check, mention_datetime, select_view
+from common import config, find, format_datetime, hybrid_check, limit_len, mention_datetime, select_view
 from features import sugestie
 from features.utils import check_staff
 
@@ -154,7 +154,7 @@ def setup(bot):
           await interaction.response.defer()
         select.callback = callback
         for sugestia in filter(sugestie.is_pending, database.data['sugestie']):
-          select.add_option(label=sugestia['text'], value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
+          select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
         view.add_item(select)
 
       submit = discord.ui.Button(style=discord.ButtonStyle.success, label='Zatwierdź')
