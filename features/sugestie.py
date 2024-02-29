@@ -122,6 +122,7 @@ async def update(sugestia):
   view.add_item(discord.ui.Button(style=discord.ButtonStyle.gray, label=f'Nie wiem ({len(sugestia["abstain"])})', custom_id='abstain'))
   view.add_item(discord.ui.Button(style=discord.ButtonStyle.red, label=f'Przeciw ({len(sugestia["against"])})', custom_id='against'))
 
+  # This breaks on sugestia deletion or when the sugestia object in database.data changes, eg. after database.load. There may be other such edge cases in the codebase.
   async def on_vote(interaction):
     user = interaction.user.id
     choice = interaction.data['custom_id']
@@ -206,7 +207,7 @@ async def clean():
       embed.set_footer(text=msg.author.our_name, icon_url=msg.author.display_avatar.url)
       my_msg = await msg.channel.send(embed=embed)
       if config['sugestie_ping_role'] is not None:
-        await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')
+        await (await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')).delete()
 
       logging.info(f'{msg.author.id} created sugestia {my_msg.id}')
       sugestia = {
@@ -363,6 +364,10 @@ def setup(_bot):
 
       logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
       database.data['sugestie'].remove(sugestia)
+      try:
+        await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).delete()
+      except discord.errors.NotFound:
+        pass
 
       await interaction.edit_original_response(content=f'Pomyślnie usunięto sugestię o treści `{limit_len(debacktick(sugestia["text"]))}`. 🙄', view=None)
       await interaction2.response.defer()
