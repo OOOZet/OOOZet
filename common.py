@@ -68,11 +68,18 @@ config = {
   'oki_youtube': 'UCw1Z4iA0T-QNaJ-sEOXeYCw', # ID (a nie nazwa użytkownika) kanału YouTube
   'youtube_api_key': None,                   # Klucz dewelopera do API YouTube
   'youtube_timeout': '1m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera YouTube
+
   'codeforces_channel': None,                # Kanał, na który są wysyłane przypomnienia o rundach na Codeforces
   'codeforces_role': None,                   # Rola, która jest pingowana w przypomnieniach o rundach
   'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
   'codeforces_poll_rate': '1d',              # Częstotliwość aktualizowania listy rund
   'codeforces_timeout': '5m',                # Maksymalny czas oczekiwania na odpowiedź od serwera Codeforces
+
+  'atcoder_channel': None,                   # Kanał, na który są wysyłane przypomnienia o kontestach na AtCoder
+  'atcoder_role': None,                      # Rola, która jest pingowana w przypomnieniach o kontestach
+  'atcoder_advance': '15m',                  # Wyprzedzenie, z którym są wysyłane przypomnienia o kontestach
+  'atcoder_poll_rate': '1d',                 # Częstotliwość aktualizowania listy kontestów
+  'atcoder_timeout': '5m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera AtCoder
 }
 
 def redacted_config():

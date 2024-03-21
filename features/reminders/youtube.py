@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, requests
+import asyncio, logging, requests
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from defusedxml import ElementTree
 
 import database
-from common import config, mention_datetime, parse_duration
-from features import websub
+from common import config, parse_duration
+from features.reminders import websub
 
 def setup(bot):
   @dataclass
@@ -119,68 +119,3 @@ def setup(bot):
     logging.exception('Got exception while downloading YouTube channel feed')
 
   websub.on_msg = process_youtube_feed
-
-  @dataclass
-  class CodeforcesContest:
-    id: int
-    title: str
-    time: datetime
-    duration: float
-
-    @property
-    def link(self):
-      return f'https://codeforces.com/contest/{self.id}'
-
-    @property
-    def is_niche(self):
-      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4', 'Hello', 'Good Bye'])
-
-  async def remind_codeforces(contest, delay=0):
-    if delay > 0:
-      logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
-      await asyncio.sleep(delay)
-      logging.info(f'Reminding about Codeforces contest {contest.id}')
-
-    if config['codeforces_channel'] is None:
-      return
-
-    if not contest.is_niche and config['codeforces_role'] is not None:
-      mention = f'<@&{config["codeforces_role"]}>' # TODO: seperate roles for div1, div2 etc
-    else:
-      mention = ''
-    relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
-
-  codeforces_reminders = []
-
-  @discord.ext.tasks.loop(seconds=parse_duration(config['codeforces_poll_rate']))
-  async def poll_codeforces():
-    logging.info('Periodically downloading Codeforces contest schedule')
-
-    response = requests.get('https://codeforces.com/api/contest.list', timeout=parse_duration(config['codeforces_timeout']))
-    response.raise_for_status()
-    json = response.json()
-    if json['status'] != 'OK':
-      logging.error(f'Codeforces contest schedule request failed: {json["comment"]!r}')
-      return
-
-    for task in codeforces_reminders:
-      task.cancel()
-    codeforces_reminders.clear()
-
-    for entry in json['result']:
-      if entry['phase'] != 'BEFORE':
-        continue
-
-      contest = CodeforcesContest(
-        entry['id'],
-        entry['name'],
-        datetime.fromtimestamp(entry['startTimeSeconds'], tz=timezone.utc),
-        entry['durationSeconds'],
-      )
-
-      delay = -entry['relativeTimeSeconds'] - parse_duration(config['codeforces_advance'])
-      if delay > 0:
-        codeforces_reminders.append(asyncio.create_task(remind_codeforces(contest, delay)))
-
-  poll_codeforces.start()

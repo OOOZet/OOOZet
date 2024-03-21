@@ -18,19 +18,22 @@ import asyncio, discord, discord.ext.commands, logging, random, threading
 
 import console
 from common import config, options
-from features import about_me, counting, misc, reminders, rules, sugestie, utils, warns, xp
+from features import about_me, counting, misc, rules, sugestie, utils, warns, xp
+from features.reminders import atcoder, codeforces, youtube
 
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
     about_me.setup(self)
+    atcoder.setup(self)
+    codeforces.setup(self)
     counting.setup(self)
     misc.setup(self)
-    reminders.setup(self)
     rules.setup(self)
     sugestie.setup(self)
     utils.setup(self)
     warns.setup(self)
     xp.setup(self)
+    youtube.setup(self)
 
     if not options['debug']:
       await self.tree.sync()
