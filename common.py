@@ -17,7 +17,8 @@
 import discord, json, logging
 
 options = {
-  'config': 'config.json'
+  'config': 'config.json',
+  'debug': False,
 }
 
 config = {

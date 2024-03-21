@@ -17,7 +17,7 @@
 import asyncio, discord, discord.ext.commands, logging, random, threading
 
 import console
-from common import config
+from common import config, options
 from features import about_me, counting, misc, reminders, rules, sugestie, utils, warns, xp
 
 class Client(discord.ext.commands.Bot):
@@ -32,8 +32,9 @@ class Client(discord.ext.commands.Bot):
     warns.setup(self)
     xp.setup(self)
 
-    await self.tree.sync()
-    await self.tree.sync(guild=discord.Object(config['guild']))
+    if not options['debug']:
+      await self.tree.sync()
+      await self.tree.sync(guild=discord.Object(config['guild']))
 
   def __init__(self):
     intents = discord.Intents.default()

@@ -170,6 +170,13 @@ async def update(sugestia):
     for button in view.children:
       button.disabled = True
 
+  async def on_show(interaction):
+    await interaction.response.send_message(describe(sugestia), ephemeral=True)
+
+  show_button = discord.ui.Button(style=discord.ButtonStyle.blurple, label='Więcej informacji')
+  show_button.callback = on_show
+  view.add_item(show_button)
+
   try:
     await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).edit(view=view)
   except discord.errors.NotFound:
@@ -296,7 +303,7 @@ def setup(_bot):
   sugestie = discord.app_commands.Group(name='sugestie', description='Komendy do sugestii', guild_ids=[config['guild']])
   bot.tree.add_command(sugestie)
 
-  @sugestie.command(description='Wyświetla sugestię')
+  @sugestie.command(description='Wyświetla sugestię z 25 najnowszych')
   @check_any
   async def show(interaction):
     async def callback(interaction2, choice):
@@ -304,7 +311,7 @@ def setup(_bot):
       await interaction2.response.send_message(describe(sugestia), ephemeral=True)
 
     select, view = select_view(callback, interaction.user)
-    for sugestia in database.data['sugestie']:
+    for sugestia in sorted(database.data['sugestie'], key=lambda x: x['vote_start'], reverse=True)[:25]: # 25 is a limit imposed on us by Discord.
       select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
     await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=view, ephemeral=True)
 

@@ -32,6 +32,8 @@ if __name__ == '__main__':
         options['config'] = args[i]
       except IndexError:
         raise Exception(f'Expected a path to config after {args[i - 1]!r}')
+    elif args[i] == '--debug':
+      options['debug'] = True
     else:
       raise Exception(f'Unknown option: {args[i]!r}')
     i += 1
