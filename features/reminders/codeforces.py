@@ -33,7 +33,7 @@ def setup(bot):
 
     @property
     def is_niche(self):
-      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4', 'Hello', 'Good Bye'])
+      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4', 'Hello', 'Good Bye', 'Global'])
 
   async def remind(contest, delay=0):
     if delay > 0:
