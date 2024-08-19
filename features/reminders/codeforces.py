@@ -51,17 +51,75 @@ def setup(bot):
     relative_time = mention_datetime(contest.time, relative=True)
     await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
 
+  async def send_country_ranking(contest):
+    logging.info(f'Sending country ranking for Codeforces contest {contest.id}')
+
+    if config['codeforces_channel'] is None:
+      return
+
+    response = requests.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}', timeout=parse_duration(config['codeforces_timeout']))
+    response.raise_for_status()
+    json = response.json()
+    if json['status'] != 'OK':
+      if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
+        return
+      logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
+      return True
+
+    msg = []
+
+    # Codeforces's documentation says we are allowed to write in as many as
+    # 10'000 users but it seems like their infrastructure fails anyway for any
+    # count of at least around 700 users.
+    for i in range(0, len(json['result']), 600):
+      batch = json['result'][i : i + 600]
+
+      response = requests.get('https://codeforces.com/api/user.info?handles=' + ';'.join(map(lambda x: x['handle'], batch)), timeout=parse_duration(config['codeforces_timeout']))
+      response.raise_for_status()
+      user_infos = response.json()
+      if user_infos['status'] != 'OK':
+        logging.error(f'Codeforces user info request failed: {user_infos["comment"]!r}')
+        return True
+
+      for entry, user_info in zip(batch, user_infos['result']):
+        assert entry['handle'] == user_info['handle']
+        if user_info.get('country') == 'Poland':
+          line = f'{len(msg) + 1}. #{entry["rank"]} [{entry["handle"]}](https://codeforces.com/profile/{entry["handle"]}) {entry["oldRating"]} → {entry["newRating"]}'
+          delta = entry['newRating'] - entry['oldRating']
+          if delta > 0:
+            line += f' **({delta:+})**'
+          else:
+            line += f' ({delta:+})'
+          line += '\n'
+          msg.append(line)
+
+    await bot.wait_until_ready()
+    channel = bot.get_channel(config['codeforces_channel'])
+    header = f'Ranking zawodników z Polski w [{contest.title}]({contest.link}): 🏆 🇵🇱\n'
+
+    if not msg:
+      await channel.send(header, suppress_embeds=True)
+      await channel.send('https://tenor.com/view/tumbleweed-desert-awkward-silence-heat-wave-crickets-gif-24664698')
+      return
+
+    msg.insert(0, header)
+    while sum(map(len, msg)) > 2000:
+      msg.pop()
+    msg = ''.join(msg)
+    await channel.send(msg, suppress_embeds=True)
+
   reminders = []
+  pending_contests = set()
 
   @discord.ext.tasks.loop(seconds=parse_duration(config['codeforces_poll_rate']))
   async def poll():
-    logging.info('Periodically downloading Codeforces contest schedule')
+    logging.info('Periodically downloading Codeforces contest list')
 
     response = requests.get('https://codeforces.com/api/contest.list', timeout=parse_duration(config['codeforces_timeout']))
     response.raise_for_status()
     json = response.json()
     if json['status'] != 'OK':
-      logging.error(f'Codeforces contest schedule request failed: {json["comment"]!r}')
+      logging.error(f'Codeforces contest list request failed: {json["comment"]!r}')
       return
 
     for task in reminders:
@@ -69,17 +127,21 @@ def setup(bot):
     reminders.clear()
 
     for entry in json['result']:
-      if entry['phase'] != 'BEFORE':
-        continue
-
       contest = Contest(
         entry['id'],
         entry['name'],
         datetime.fromtimestamp(entry['startTimeSeconds'], tz=timezone.utc),
       )
 
-      delay = -entry['relativeTimeSeconds'] - parse_duration(config['codeforces_advance'])
-      if delay > 0:
-        reminders.append(asyncio.create_task(remind(contest, delay)))
+      if entry['phase'] == 'BEFORE':
+        delay = -entry['relativeTimeSeconds'] - parse_duration(config['codeforces_advance'])
+        if delay > 0:
+          reminders.append(asyncio.create_task(remind(contest, delay)))
+
+      if entry['phase'] != 'FINISHED':
+        pending_contests.add(contest.id)
+      elif contest.id in pending_contests:
+        if not await send_country_ranking(contest):
+          pending_contests.remove(contest.id)
 
   poll.start()

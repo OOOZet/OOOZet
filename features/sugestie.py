@@ -122,7 +122,7 @@ async def update(sugestia):
   view.add_item(discord.ui.Button(style=discord.ButtonStyle.gray, label=f'Nie wiem ({len(sugestia["abstain"])})', custom_id='abstain'))
   view.add_item(discord.ui.Button(style=discord.ButtonStyle.red, label=f'Przeciw ({len(sugestia["against"])})', custom_id='against'))
 
-  # This breaks on sugestia deletion or when the sugestia object in database.data changes, eg. after database.load. There may be other such edge cases in the codebase.
+  # This breaks on sugestia deletion or when the sugestia object in database.data changes, e.g. after database.load. There may be other such edge cases in the codebase.
   async def on_vote(interaction):
     user = interaction.user.id
     choice = interaction.data['custom_id']
