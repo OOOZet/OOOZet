@@ -51,8 +51,8 @@ def setup(bot):
     relative_time = mention_datetime(contest.time, relative=True)
     await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
 
-  async def send_country_ranking(contest):
-    logging.info(f'Sending country ranking for Codeforces contest {contest.id}')
+  async def send_national_standings(contest):
+    logging.info(f'Sending national standings for Codeforces contest {contest.id}')
 
     if config['codeforces_channel'] is None:
       return
@@ -64,6 +64,9 @@ def setup(bot):
       if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
         return
       logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
+      return True
+    elif not json['result']:
+      logging.error('Codeforces contest rating changes are empty')
       return True
 
     msg = []
@@ -81,17 +84,19 @@ def setup(bot):
         logging.error(f'Codeforces user info request failed: {user_infos["comment"]!r}')
         return True
 
+      assert len(batch) == len(user_infos['result'])
       for entry, user_info in zip(batch, user_infos['result']):
-        assert entry['handle'] == user_info['handle']
-        if user_info.get('country') == 'Poland':
-          line = f'{len(msg) + 1}. #{entry["rank"]} [{entry["handle"]}](https://codeforces.com/profile/{entry["handle"]}) {entry["oldRating"]} → {entry["newRating"]}'
-          delta = entry['newRating'] - entry['oldRating']
-          if delta > 0:
-            line += f' **({delta:+})**'
-          else:
-            line += f' ({delta:+})'
-          line += '\n'
-          msg.append(line)
+        if user_info.get('country') != 'Poland':
+          continue
+        # contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
+        line = f'{len(msg) + 1}. #{entry["rank"]} [{user_info["handle"]}](https://codeforces.com/profile/{user_info["handle"]}) {entry["oldRating"]} → {entry["newRating"]}'
+        delta = entry['newRating'] - entry['oldRating']
+        if delta > 0:
+          line += f' **({delta:+})**'
+        else:
+          line += f' ({delta:+})'
+        line += '\n'
+        msg.append(line)
 
     await bot.wait_until_ready()
     channel = bot.get_channel(config['codeforces_channel'])
@@ -139,9 +144,10 @@ def setup(bot):
           reminders.append(asyncio.create_task(remind(contest, delay)))
 
       if entry['phase'] != 'FINISHED':
+        logging.info(f'Adding Codeforces contest {contest.id} to watchlist')
         pending_contests.add(contest.id)
       elif contest.id in pending_contests:
-        if not await send_country_ranking(contest):
+        if not await send_national_standings(contest):
           pending_contests.remove(contest.id)
 
   poll.start()
