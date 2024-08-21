@@ -66,10 +66,10 @@ def setup(bot):
       logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
       return True
     elif not json['result']:
-      logging.error('Codeforces contest rating changes are empty')
+      logging.error('Codeforces contest rating changes are not available yet')
       return True
 
-    msg = []
+    lines = []
 
     # Codeforces's documentation says we are allowed to write in as many as
     # 10'000 users but it seems like their infrastructure fails anyway for any
@@ -89,32 +89,36 @@ def setup(bot):
         if user_info.get('country') != 'Poland':
           continue
         # contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
-        line = f'{len(msg) + 1}. #{entry["rank"]} [{user_info["handle"]}](https://codeforces.com/profile/{user_info["handle"]}) {entry["oldRating"]} → {entry["newRating"]}'
+        line = f'{len(lines) + 1}. #{entry["rank"]} [{user_info["handle"]}](https://codeforces.com/profile/{user_info["handle"]}) {entry["oldRating"]} → {entry["newRating"]}'
         delta = entry['newRating'] - entry['oldRating']
         if delta > 0:
           line += f' **({delta:+})**'
         else:
           line += f' ({delta:+})'
         line += '\n'
-        msg.append(line)
+        lines.append(line)
 
     await bot.wait_until_ready()
     channel = bot.get_channel(config['codeforces_channel'])
     header = f'Ranking zawodników z Polski w [{contest.title}]({contest.link}): 🏆 🇵🇱\n'
 
-    if not msg:
+    if not lines:
       await channel.send(header, suppress_embeds=True)
       await channel.send('https://tenor.com/view/tumbleweed-desert-awkward-silence-heat-wave-crickets-gif-24664698')
       return
 
-    msg.insert(0, header)
-    while sum(map(len, msg)) > 2000:
-      msg.pop()
-    msg = ''.join(msg)
-    await channel.send(msg, suppress_embeds=True)
+    lines.insert(0, header)
+    while lines:
+      cnt = 1
+      size = len(lines[0])
+      while cnt < len(lines) and size + len(lines[cnt]) <= 2000:
+        size += len(lines[cnt])
+        cnt += 1
+      await channel.send(''.join(lines[:cnt]), suppress_embeds=True)
+      del lines[:cnt]
 
   reminders = []
-  pending_contests = set()
+  watchlist = set()
 
   @discord.ext.tasks.loop(seconds=parse_duration(config['codeforces_poll_rate']))
   async def poll():
@@ -145,9 +149,9 @@ def setup(bot):
 
       if entry['phase'] != 'FINISHED':
         logging.info(f'Adding Codeforces contest {contest.id} to watchlist')
-        pending_contests.add(contest.id)
-      elif contest.id in pending_contests:
+        watchlist.add(contest.id)
+      elif contest.id in watchlist:
         if not await send_national_standings(contest):
-          pending_contests.remove(contest.id)
+          watchlist.remove(contest.id)
 
   poll.start()
