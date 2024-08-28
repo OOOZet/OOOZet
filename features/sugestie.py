@@ -49,56 +49,6 @@ def emoji_status_of(sugestia):
   else:
     return '✅'
 
-def describe(sugestia):
-  msg = mention_message(bot, sugestia['channel'], sugestia['id'])
-  vote_start = mention_datetime(sugestia['vote_start'])
-  text = debacktick(sugestia['text'])
-  result = f'Sugestia {msg} z dnia {vote_start} ma następującą treść:```\n{text}```'
-
-  vote_end = mention_datetime(sugestia['vote_end'])
-  if 'outcome' in sugestia:
-    result += f'Głosowanie zakończyło się {vote_end} wynikiem '
-    if sugestia['outcome']:
-      result += '**pozytywnym**. ✅\n'
-    else:
-      result += '**negatywnym**. ❌\n'
-  elif 'annulled' in sugestia:
-    result += f'Głosowanie miało skończyć się {vote_end}.\n'
-  else:
-    result += f'**Głosowanie jeszcze trwa** i skończy się {vote_end}. ❔\n'
-
-  if sugestia['for']:
-    voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
-    result += f'- Głosowali **za**: {voters}\n'
-  else:
-    result += '- **Nikt** nie głosował **za**.\n'
-
-  if sugestia['abstain']:
-    voters = ', '.join(f'<@{i}>' for i in sugestia['abstain'])
-    result += f'- **Wstrzymali się** od głosu: {voters}\n'
-  else:
-    result += '- **Nikt** nie **wstrzymał się** od głosu.\n'
-
-  if sugestia['against']:
-    voters = ', '.join(f'<@{i}>' for i in sugestia['against'])
-    result += f'- Głosowali **przeciw**: {voters}\n'
-  else:
-    result += '- **Nikt** nie głosował **przeciw**.\n'
-
-  if 'annulled' in sugestia:
-    time = mention_datetime(sugestia['annulled']['time'])
-    reason = debacktick(sugestia['annulled']['reason'])
-    result += f'Sugestia **została unieważniona** {time} z powodu `{reason}`. 🚯\n'
-  elif sugestia.get('outcome', False):
-    if 'done' in sugestia:
-      time = mention_datetime(sugestia['done']['time'])
-      changes = debacktick(sugestia['done']['changes'])
-      result += f'Sugestia **została wykonana** {time} z opisem zmian `{changes}` ✅\n'
-    else:
-      result += 'Sugestia **nie została jeszcze wykonana** przez administrację. ❓\n'
-
-  return result
-
 def view_for(sugestia):
   view = discord.ui.View(timeout=None)
   view.add_item(discord.ui.Button(custom_id='for', label=f'Za ({len(sugestia["for"])})', style=discord.ButtonStyle.green))
@@ -154,7 +104,49 @@ def view_for(sugestia):
       button.disabled = True
 
   async def on_describe(interaction):
-    await interaction.response.send_message(describe(sugestia), ephemeral=True)
+    vote_end = mention_datetime(sugestia['vote_end'])
+    if 'outcome' in sugestia:
+      result = f'Głosowanie zakończyło się {vote_end} wynikiem '
+      if sugestia['outcome']:
+        result += '**pozytywnym**. ✅\n'
+      else:
+        result += '**negatywnym**. ❌\n'
+    elif 'annulled' in sugestia:
+      result = f'Głosowanie miało skończyć się {vote_end}.\n'
+    else:
+      result = f'**Głosowanie jeszcze trwa** i skończy się {vote_end}. ❔\n'
+
+    if sugestia['for']:
+      voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
+      result += f'- Głosowali **za**: {voters}\n'
+    else:
+      result += '- **Nikt** nie głosował **za**.\n'
+
+    if sugestia['abstain']:
+      voters = ', '.join(f'<@{i}>' for i in sugestia['abstain'])
+      result += f'- **Wstrzymali się** od głosu: {voters}\n'
+    else:
+      result += '- **Nikt** nie **wstrzymał się** od głosu.\n'
+
+    if sugestia['against']:
+      voters = ', '.join(f'<@{i}>' for i in sugestia['against'])
+      result += f'- Głosowali **przeciw**: {voters}\n'
+    else:
+      result += '- **Nikt** nie głosował **przeciw**.\n'
+
+    if 'annulled' in sugestia:
+      time = mention_datetime(sugestia['annulled']['time'])
+      reason = debacktick(sugestia['annulled']['reason'])
+      result += f'Sugestia **została unieważniona** {time} z powodu `{reason}`. 🚯\n'
+    elif sugestia.get('outcome', False):
+      if 'done' in sugestia:
+        time = mention_datetime(sugestia['done']['time'])
+        changes = debacktick(sugestia['done']['changes'])
+        result += f'Sugestia **została wykonana** {time} z opisem zmian `{changes}` ✅\n'
+      else:
+        result += 'Sugestia **nie została jeszcze wykonana** przez administrację. ❓\n'
+
+    await interaction.response.send_message(result, ephemeral=True)
 
   describe_button = discord.ui.Button(custom_id='describe', label='Więcej informacji', style=discord.ButtonStyle.blurple)
   describe_button.callback = on_describe
@@ -291,7 +283,9 @@ def setup(_bot):
       bot.add_view(view_for(sugestia), message_id=sugestia['id'])
       if is_ongoing(sugestia):
         async def timer(sugestia):
-          await asyncio.sleep((sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5) # 5 seconds to make sure the if passes.
+          delay = (sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
+          logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
+          await asyncio.sleep(delay)
           await update(sugestia)
         asyncio.create_task(timer(sugestia))
 
@@ -311,7 +305,8 @@ def setup(_bot):
   async def show(interaction):
     async def callback(interaction2, choice):
       sugestia = find(int(choice), database.data['sugestie'], proj=lambda x: x['id'])
-      await interaction2.response.send_message(describe(sugestia), ephemeral=True)
+      embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+      await interaction2.response.send_message(embed=embed, ephemeral=True)
 
     await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
       list(map(
