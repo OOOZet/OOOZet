@@ -99,28 +99,11 @@ def describe(sugestia):
 
   return result
 
-async def update(sugestia):
-  logging.info(f'Updating sugestia {sugestia["id"]}')
-
-  if is_ongoing(sugestia):
-    with database.lock:
-      if config['sugestie_deciding_lead'] is not None and abs(len(sugestia['for']) - len(sugestia['against'])) >= config['sugestie_deciding_lead']:
-        sugestia['vote_end'] = datetime.now().astimezone()
-        database.should_save = True
-
-      if datetime.now().astimezone() >= sugestia['vote_end']:
-        sugestia['outcome'] = len(sugestia['for']) > len(sugestia['against'])
-        database.should_save = True
-
-        if sugestia['outcome']:
-          logging.info(f'Sugestia {sugestia["id"]} has passed')
-        else:
-          logging.info(f'Sugestia {sugestia["id"]} did not pass')
-
+def view_for(sugestia):
   view = discord.ui.View(timeout=None)
-  view.add_item(discord.ui.Button(style=discord.ButtonStyle.green, label=f'Za ({len(sugestia["for"])})', custom_id='for'))
-  view.add_item(discord.ui.Button(style=discord.ButtonStyle.gray, label=f'Nie wiem ({len(sugestia["abstain"])})', custom_id='abstain'))
-  view.add_item(discord.ui.Button(style=discord.ButtonStyle.red, label=f'Przeciw ({len(sugestia["against"])})', custom_id='against'))
+  view.add_item(discord.ui.Button(custom_id='for', label=f'Za ({len(sugestia["for"])})', style=discord.ButtonStyle.green))
+  view.add_item(discord.ui.Button(custom_id='abstain', label=f'Nie wiem ({len(sugestia["abstain"])})', style=discord.ButtonStyle.gray))
+  view.add_item(discord.ui.Button(custom_id='against', label=f'Przeciw ({len(sugestia["against"])})', style=discord.ButtonStyle.red))
 
   # This breaks on sugestia deletion or when the sugestia object in database.data changes, e.g. after database.load. There may be other such edge cases in the codebase.
   async def on_vote(interaction):
@@ -170,25 +153,41 @@ async def update(sugestia):
     for button in view.children:
       button.disabled = True
 
-  async def on_show(interaction):
+  async def on_describe(interaction):
     await interaction.response.send_message(describe(sugestia), ephemeral=True)
 
-  show_button = discord.ui.Button(style=discord.ButtonStyle.blurple, label='Więcej informacji')
-  show_button.callback = on_show
-  view.add_item(show_button)
+  describe_button = discord.ui.Button(custom_id='describe', label='Więcej informacji', style=discord.ButtonStyle.blurple)
+  describe_button.callback = on_describe
+  view.add_item(describe_button)
+
+  return view
+
+async def update(sugestia):
+  logging.info(f'Updating sugestia {sugestia["id"]}')
+
+  if is_ongoing(sugestia):
+    with database.lock:
+      if config['sugestie_deciding_lead'] is not None and abs(len(sugestia['for']) - len(sugestia['against'])) >= config['sugestie_deciding_lead']:
+        sugestia['vote_end'] = datetime.now().astimezone()
+        database.should_save = True
+
+      if datetime.now().astimezone() >= sugestia['vote_end']:
+        sugestia['outcome'] = len(sugestia['for']) > len(sugestia['against'])
+        database.should_save = True
+
+        if sugestia['outcome']:
+          logging.info(f'Sugestia {sugestia["id"]} has passed')
+        else:
+          logging.info(f'Sugestia {sugestia["id"]} did not pass')
 
   try:
-    await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).edit(view=view)
+    await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).edit(view=view_for(sugestia))
   except discord.errors.NotFound:
     logging.warn(f'Sugestia {sugestia["id"]} is missing')
 
 async def update_all():
   logging.info('Updating all sugestie')
   for sugestia in database.data.get('sugestie', []):
-    await update(sugestia)
-
-async def update_ongoing():
-  for sugestia in filter(is_ongoing, database.data.get('sugestie', [])):
     await update(sugestia)
 
 cleaning_lock = asyncio.Lock()
@@ -283,16 +282,19 @@ def setup(_bot):
     else:
       raise
 
-  @discord.ext.tasks.loop(seconds=parse_duration(config['sugestie_autoupdate']))
-  async def loop():
-    logging.info('Periodically updating ongoing sugestie')
-    await update_ongoing()
-
   @bot.listen()
   async def on_ready():
     logging.info('Cleaning #sugestie')
     await clean()
-    loop.start()
+
+    for sugestia in database.data.get('sugestie', []):
+      bot.add_view(view_for(sugestia), message_id=sugestia['id'])
+      if is_ongoing(sugestia):
+        async def timer(sugestia):
+          await asyncio.sleep((sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5) # 5 seconds to make sure the if passes.
+          await update(sugestia)
+        asyncio.create_task(timer(sugestia))
+
     logging.info('Sugestie is ready')
 
   @bot.listen()
