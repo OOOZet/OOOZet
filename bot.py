@@ -83,8 +83,6 @@ class Client(discord.ext.commands.Bot):
   async def on_ready(self):
     logging.info(f'Logged in as {str(self.user)!r}')
 
-# TODO: egzekwowanie regulaminu
-
 client = None
 start_event = threading.Event()
 stop_event = threading.Event()

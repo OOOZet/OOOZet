@@ -61,7 +61,7 @@ config = {
     '5s', '15s', '30s', '1m',
     '5m', '15m', '30m', '1h'
   ],
-  'websub_timeout': '1m',                    # Maksymalny czas oczekiwania na subskrypcję i weryfikację subskrypcji
+  'websub_timeout': '1m',                    # Maksymalny czas oczekiwania na subskrypcję i weryfikację subskrypcji
 
   'oki_channel': None,                       # Kanał, na który są wysyłane ogłoszenia o transmisjach na żywo i nowych filmach OKI
   'oki_role': None,                          # Rola, która jest pingowana przy każdym ogłoszeniu o nowym filmie lub transmisji
@@ -138,20 +138,50 @@ def mention_message(client, channel, msg):
 def debacktick(string):
   return string.replace('`', '')
 
-def select_view(callback, owner=None):
+def select_view(select_options, callback, owner):
+  view = discord.ui.View()
+  async def interaction_check(interaction):
+    return interaction.user == owner
+  view.interaction_check = interaction_check
+
   select = discord.ui.Select()
   async def our_callback(interaction):
     await callback(interaction, select.values[0])
   select.callback = our_callback
-
-  view = discord.ui.View()
+  select.options = select_options[:25]
   view.add_item(select)
-  if owner is not None:
-    async def interaction_check(interaction):
-      return interaction.user == owner
-    view.interaction_check = interaction_check
 
-  return select, view
+  pagec = (len(select_options) + 25 - 1) // 25
+  if pagec > 1:
+    curr_page = 0
+    async def refresh(interaction):
+      await interaction.response.defer()
+      select.options = select_options[25 * curr_page : 25 * (curr_page + 1)]
+      prev.disabled = curr_page - 1 < 0
+      indicator.label = f'Strona {curr_page + 1} z {pagec}'
+      next.disabled = curr_page + 1 >= pagec
+      await interaction.edit_original_response(view=view)
+
+    prev = discord.ui.Button(label='←', disabled=True)
+    async def prev_callback(interaction):
+      nonlocal curr_page
+      curr_page -= 1
+      await refresh(interaction)
+    prev.callback = prev_callback
+    view.add_item(prev)
+
+    indicator = discord.ui.Button(label=f'Strona 1 z {pagec}', disabled=True)
+    view.add_item(indicator)
+
+    next = discord.ui.Button(label='→')
+    async def next_callback(interaction):
+      nonlocal curr_page
+      curr_page += 1
+      await refresh(interaction)
+    next.callback = next_callback
+    view.add_item(next)
+
+  return view
 
 def find(value, iterable, *, proj=lambda x: x):
   return next(filter(lambda x: proj(x) == value, iterable))

@@ -62,10 +62,14 @@ def setup(bot):
         ephemeral=True,
       )
 
-    select, view = select_view(callback, interaction.user)
-    for rules in database.data['rules']:
-      select.add_option(label=format_datetime(rules['time']), value=id(rules))
-    await interaction.response.send_message('Którą wersję regulaminu chcesz zobaczyć?', view=view, ephemeral=True)
+    await interaction.response.send_message('Którą wersję regulaminu chcesz zobaczyć?', view=select_view(
+      list(map(
+        lambda rules: discord.SelectOption(label=format_datetime(rules['time']), value=id(rules)),
+        database.data['rules'],
+      )),
+      callback,
+      interaction.user,
+    ), ephemeral=True)
 
   def fragment_text(string):
     fragment = []

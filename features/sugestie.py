@@ -213,8 +213,6 @@ async def clean():
       embed = discord.Embed(title='Sugestia', description=msg.content)
       embed.set_footer(text=msg.author.our_name, icon_url=msg.author.display_avatar.url)
       my_msg = await msg.channel.send(embed=embed)
-      if config['sugestie_ping_role'] is not None:
-        await (await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')).delete()
 
       logging.info(f'{msg.author.id} created sugestia {my_msg.id}')
       sugestia = {
@@ -233,6 +231,9 @@ async def clean():
       database.should_save = True
 
       await update(sugestia)
+
+      if config['sugestie_ping_role'] is not None:
+        await (await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')).delete()
 
 @dataclass
 class NoSugestieError(discord.app_commands.CheckFailure):
@@ -303,17 +304,26 @@ def setup(_bot):
   sugestie = discord.app_commands.Group(name='sugestie', description='Komendy do sugestii', guild_ids=[config['guild']])
   bot.tree.add_command(sugestie)
 
-  @sugestie.command(description='Wyświetla sugestię z 25 najnowszych')
+  @sugestie.command(description='Wyświetla sugestię')
   @check_any
   async def show(interaction):
     async def callback(interaction2, choice):
       sugestia = find(int(choice), database.data['sugestie'], proj=lambda x: x['id'])
       await interaction2.response.send_message(describe(sugestia), ephemeral=True)
 
-    select, view = select_view(callback, interaction.user)
-    for sugestia in sorted(database.data['sugestie'], key=lambda x: x['vote_start'], reverse=True)[:25]: # 25 is a limit imposed on us by Discord.
-      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
-    await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=view, ephemeral=True)
+    await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
+      list(map(
+        lambda sugestia: discord.SelectOption(
+          label=limit_len(sugestia['text']),
+          value=sugestia['id'],
+          description=format_datetime(sugestia['vote_start']),
+          emoji=emoji_status_of(sugestia),
+        ),
+        sorted(database.data['sugestie'], key=lambda x: x['vote_start'], reverse=True),
+      )),
+      callback,
+      interaction.user,
+    ), ephemeral=True)
 
   @sugestie.command(description='Oznacza sugestię jako wykonaną')
   @check_pending
@@ -333,10 +343,18 @@ def setup(_bot):
       await interaction.edit_original_response(content=f'Pomyślnie oznaczono sugestię {msg} jako wykonaną z opisem zmian `{debacktick(changes)}`! 🥳', view=None)
       await interaction2.response.defer()
 
-    select, view = select_view(callback, interaction.user)
-    for sugestia in filter(is_pending, database.data['sugestie']):
-      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
-    await interaction.response.send_message(f'Którą sugestię chcesz oznaczyć jako wykonaną z opisem zmian `{debacktick(changes)}`?', view=view)
+    await interaction.response.send_message(f'Którą sugestię chcesz oznaczyć jako wykonaną z opisem zmian `{debacktick(changes)}`?', view=select_view(
+      list(map(
+        lambda sugestia: discord.SelectOption(
+          label=limit_len(sugestia['text']),
+          value=sugestia['id'],
+          description=format_datetime(sugestia['vote_start']),
+        ),
+        filter(is_pending, database.data['sugestie']),
+      )),
+      callback,
+      interaction.user,
+    ))
 
   @sugestie.command(description='Unieważnia sugestię')
   @check_annullable
@@ -358,10 +376,19 @@ def setup(_bot):
 
       await update(sugestia)
 
-    select, view = select_view(callback, interaction.user)
-    for sugestia in filter(is_annullable, database.data['sugestie']):
-      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
-    await interaction.response.send_message(f'Którą sugestię chcesz unieważnić z powodu `{debacktick(reason)}`?', view=view)
+    await interaction.response.send_message(f'Którą sugestię chcesz unieważnić z powodu `{debacktick(reason)}`?', view=select_view(
+      list(map(
+        lambda sugestia: discord.SelectOption(
+          label=limit_len(sugestia['text']),
+          value=sugestia['id'],
+          description=format_datetime(sugestia['vote_start']),
+          emoji=emoji_status_of(sugestia),
+        ),
+        filter(is_annullable, database.data['sugestie'])
+      )),
+      callback,
+      interaction.user,
+    ))
 
   @sugestie.command(description='Usuwa pomyłkowo wysłaną sugestię')
   @check_eraseable
@@ -379,10 +406,19 @@ def setup(_bot):
       await interaction.edit_original_response(content=f'Pomyślnie usunięto sugestię o treści `{limit_len(debacktick(sugestia["text"]))}`. 🙄', view=None)
       await interaction2.response.defer()
 
-    select, view = select_view(callback, interaction.user)
-    for sugestia in filter(is_eraseable_in(interaction), database.data['sugestie']):
-      select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']), emoji=emoji_status_of(sugestia))
-    await interaction.response.send_message(f'Którą sugestię chcesz usunąć?', view=view)
+    await interaction.response.send_message(f'Którą sugestię chcesz usunąć?', view=select_view(
+      list(map(
+        lambda sugestia: discord.SelectOption(
+          label=limit_len(sugestia['text']),
+          value=sugestia['id'],
+          description=format_datetime(sugestia['vote_start']),
+          emoji=emoji_status_of(sugestia),
+        ),
+        filter(is_eraseable_in(interaction), database.data['sugestie']),
+      )),
+      callback,
+      interaction.user,
+    ))
 
 console.begin('sugestie')
 console.register('update_all', None, 'updates all sugestie', lambda: asyncio.run_coroutine_threadsafe(update_all(), bot.loop).result())

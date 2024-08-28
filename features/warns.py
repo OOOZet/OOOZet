@@ -102,14 +102,22 @@ def setup(_bot):
       await update_roles_for(member)
 
       reason = debacktick(warn['reason'])
-      time = mention_datetime(warn["time"])
+      time = mention_datetime(warn['time'])
       await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia {time} użytkownikowi {member.mention}! 🥳', view=None)
       await interaction2.response.defer()
 
-    select, view = select_view(callback, interaction.user)
-    for warn in database.data['warns'][member.id]:
-      select.add_option(label=limit_len(warn['reason']), value=id(warn), description=format_datetime(warn['time']))
-    await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {member.mention}?', view=view)
+    await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {member.mention}?', view=select_view(
+      list(map(
+        lambda warn: discord.SelectOption(
+          label=limit_len(warn['reason']),
+          value=id(warn),
+          description=format_datetime(warn['time']),
+        ),
+        database.data['warns'][member.id],
+      )),
+      callback,
+      interaction.user,
+    ))
 
   @bot.tree.command(name='unwarn', description='Odbiera warna użytkownikowi')
   @discord.app_commands.guilds(config['guild'])
