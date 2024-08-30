@@ -58,45 +58,62 @@ def setup(bot):
       return
 
     response = requests.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}', timeout=parse_duration(config['codeforces_timeout']))
-    response.raise_for_status()
     json = response.json()
     if json['status'] != 'OK':
-      if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
-        return
-      logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
-      return True
+      if json['comment'] != 'contestId: Rating changes are unavailable for this contest':
+        logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
+        return True
     elif not json['result']:
       logging.error('Codeforces contest rating changes are not available yet')
       return True
+    rating_changes = {i['handle']: i for i in json.get('result', [])}
 
-    lines = []
+    response = requests.get(f'https://codeforces.com/api/contest.standings?contestId={contest.id}&participantTypes=CONTESTANT,OUT_OF_COMPETITION', timeout=parse_duration(config['codeforces_timeout']))
+    standings = response.json()
+    if standings['status'] != 'OK':
+      logging.error(f'Codeforces contest standings request failed: {standings["comment"]!r}')
+      return True
 
+    user_infos = {}
+
+    handles = [member['handle'] for entry in standings['result']['rows'] for member in entry['party']['members']]
     # Codeforces's documentation says we are allowed to write in as many as
     # 10'000 users but it seems like their infrastructure fails anyway for any
     # count of at least around 700 users.
-    for i in range(0, len(json['result']), 600):
-      batch = json['result'][i : i + 600]
+    for i in range(0, len(handles), 600):
+      batch = handles[i : i + 600]
 
-      response = requests.get('https://codeforces.com/api/user.info?handles=' + ';'.join(map(lambda x: x['handle'], batch)), timeout=parse_duration(config['codeforces_timeout']))
-      response.raise_for_status()
-      user_infos = response.json()
-      if user_infos['status'] != 'OK':
-        logging.error(f'Codeforces user info request failed: {user_infos["comment"]!r}')
+      response = requests.get('https://codeforces.com/api/user.info?handles=' + ';'.join(batch), timeout=parse_duration(config['codeforces_timeout']))
+      json = response.json()
+      if json['status'] != 'OK':
+        logging.error(f'Codeforces user info request failed: {json["comment"]!r}')
         return True
 
-      assert len(batch) == len(user_infos['result'])
-      for entry, user_info in zip(batch, user_infos['result']):
-        if user_info.get('country') != 'Poland':
-          continue
-        # contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
-        line = f'{len(lines) + 1}. #{entry["rank"]} [{user_info["handle"]}](https://codeforces.com/profile/{user_info["handle"]}) {entry["oldRating"]} → {entry["newRating"]}'
-        delta = entry['newRating'] - entry['oldRating']
+      assert len(batch) == len(json['result'])
+      user_infos.update(zip(batch, json['result']))
+
+    lines = []
+
+    for entry in standings['result']['rows']:
+      team = [member['handle'] for member in entry['party']['members']]
+
+      if not all(user_infos[i].get('country') == 'Poland' for i in team):
+        continue
+
+      line = f'{len(lines) + 1}. #{entry["rank"]} '
+      # contest.standings/contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
+      line += ', '.join(f'[{user_infos[i]["handle"]}](https://codeforces.com/profile/{user_infos[i]["handle"]})' for i in team)
+      if len(team) == 1 and team[0] in rating_changes:
+        old = rating_changes[team[0]]["oldRating"]
+        new = rating_changes[team[0]]["newRating"]
+        line += f' {old} → {new}'
+        delta = new - old
         if delta > 0:
           line += f' **({delta:+})**'
         else:
           line += f' ({delta:+})'
-        line += '\n'
-        lines.append(line)
+      line += '\n'
+      lines.append(line)
 
     await bot.wait_until_ready()
     channel = bot.get_channel(config['codeforces_channel'])
