@@ -50,8 +50,8 @@ config = {
   'sugestie_channel': None,                  # Kanal "#sugestie"
   'sugestie_vote_role': None,                # Rola, która może głosować nad sugestiami
   'sugestie_ping_role': None,                # Rola, która jest pingowana, gdy pojawia się nowa sugestia
-  'sugestie_vote_length': '1d',              # Czas na głosowanie nad sugestią
-  'sugestie_deciding_lead': None,            # Przewaga, po której jedna z opcji wygrywa
+  'sugestie_vote_length': '2d',              # Czas na głosowanie nad sugestią
+  'sugestie_deciding_lead': 9,               # Przewaga, po której jedna z opcji wygrywa
 
   'websub_host': None,                       # Adres tego serwera
   'websub_port': 13579,                      # Port, na którym będzie odpalony serwer WebSub
@@ -65,6 +65,7 @@ config = {
   'oki_channel': None,                       # Kanał, na który są wysyłane ogłoszenia o transmisjach na żywo i nowych filmach OKI
   'oki_role': None,                          # Rola, która jest pingowana przy każdym ogłoszeniu o nowym filmie lub transmisji
   'oki_youtube': 'UCw1Z4iA0T-QNaJ-sEOXeYCw', # ID (a nie nazwa użytkownika) kanału YouTube
+  'youtube_advance': '5m',                   # Wyprzedzenie, z którym są wysyłane ogłoszenia o transmisjach
   'youtube_api_key': None,                   # Klucz dewelopera do API YouTube
   'youtube_timeout': '1m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera YouTube
 

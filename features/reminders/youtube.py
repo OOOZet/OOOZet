@@ -16,11 +16,11 @@
 
 import asyncio, logging, requests
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
 
 import database
-from common import config, parse_duration
+from common import config, mention_datetime, parse_duration
 from features.reminders import websub
 
 def setup(bot):
@@ -37,23 +37,22 @@ def setup(bot):
 
   async def remind_oki(video):
     if video.is_livestream:
-      delay = (video.time - datetime.now().astimezone()).total_seconds()
-      if delay < 0:
-        return
-      logging.info(f'Setting reminder for YouTube livestream {video.id} for {video.time}')
+      time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
+      logging.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
+      delay = (time - datetime.now().astimezone()).total_seconds()
       await asyncio.sleep(delay)
       logging.info(f'Reminding about YouTube livestream {video.id}')
-
-    await bot.wait_until_ready()
 
     if config['oki_channel'] is None:
       return
 
     mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
     if video.is_livestream:
-      announcement = f'{mention} Na kanale OKI właśnie zaczyna się transmisja na żywo: [{video.title}]({video.link})! 🔔'
+      relative_time = mention_datetime(video.time, relative=True)
+      announcement = f'{mention} Za {relative_time} na kanale OKI zacznie się transmisja na żywo: [{video.title}]({video.link})! 🔔'
     else:
       announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.title}]({video.link})! 🔔'
+    await bot.wait_until_ready()
     await bot.get_channel(config['oki_channel']).send(announcement)
 
   def parse_youtube_feed(content):
