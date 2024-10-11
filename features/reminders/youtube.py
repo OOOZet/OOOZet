@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
 
 import database
-from common import config, mention_datetime, parse_duration
+from common import config, escape, mention_datetime, parse_duration
 from features.reminders import websub
 
 def setup(bot):
@@ -49,9 +49,9 @@ def setup(bot):
     mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
     if video.is_livestream:
       relative_time = mention_datetime(video.time, relative=True)
-      announcement = f'{mention} Za {relative_time} na kanale OKI zacznie się transmisja na żywo: [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{escape(video.title)}]({video.link})! 🔔'
     else:
-      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{escape(video.title)}]({video.link})! 🔔'
     await bot.wait_until_ready()
     await bot.get_channel(config['oki_channel']).send(announcement)
 
@@ -89,18 +89,24 @@ def setup(bot):
 
     return videos
 
+  reminders = []
+
   def process_youtube_feed(content):
     if 'oki_last_published' not in database.data:
       logging.info("OKI's YouTube channel has never been checked before")
       database.data['oki_last_published'] = datetime.now().astimezone()
       database.should_save = True
 
+    for task in reminders:
+      task.cancel()
+    reminders.clear()
+
     last_published = database.data['oki_last_published']
     for video in parse_youtube_feed(content):
       if video.is_livestream and video.time > datetime.now().astimezone():
-        asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop)
+        reminders.append(asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop))
       elif not video.is_livestream and video.time > last_published:
-        asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop)
+        reminders.append(asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop))
         with database.lock:
           database.data['oki_last_published'] = max(database.data['oki_last_published'], video.time)
           database.should_save = True

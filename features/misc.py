@@ -99,8 +99,8 @@ def setup(_bot):
     mentions = ' '.join(i.mention for i in staff)
     await interaction.response.send_message(f'{mentions} Potrzebna natychmiastowa interwencja!!! {emoji}')
     for user in staff:
-      guild = bot.get_guild(config['guild'])
-      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na **{guild}**!!! {emoji}')
+      msg = (await interaction.original_response()).jump_url
+      await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {msg}!!! {emoji}')
       await user.send('https://c.tenor.com/EDeg5ifIrjQAAAAC/alarm-better-discord.gif')
 
   @bot.tree.command(description='Wyświetla skład administracji')

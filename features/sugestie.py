@@ -182,6 +182,12 @@ async def update_all():
   for sugestia in database.data.get('sugestie', []):
     await update(sugestia)
 
+async def update_on_vote_end(sugestia):
+  delay = (sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
+  logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
+  await asyncio.sleep(delay)
+  await update(sugestia)
+
 cleaning_lock = asyncio.Lock()
 async def clean():
   if config['sugestie_channel'] is None:
@@ -222,6 +228,7 @@ async def clean():
       database.should_save = True
 
       await update(sugestia)
+      asyncio.create_task(update_on_vote_end(sugestia))
 
       if config['sugestie_ping_role'] is not None:
         await (await msg.channel.send(f'<@&{config["sugestie_ping_role"]}>')).delete()
@@ -282,12 +289,7 @@ def setup(_bot):
     for sugestia in database.data.get('sugestie', []):
       bot.add_view(view_for(sugestia), message_id=sugestia['id'])
       if is_ongoing(sugestia):
-        async def timer(sugestia):
-          delay = (sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
-          logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
-          await asyncio.sleep(delay)
-          await update(sugestia)
-        asyncio.create_task(timer(sugestia))
+        asyncio.create_task(update_on_vote_end(sugestia))
 
     logging.info('Sugestie is ready')
 
@@ -316,7 +318,7 @@ def setup(_bot):
           description=format_datetime(sugestia['vote_start']),
           emoji=emoji_status_of(sugestia),
         ),
-        sorted(database.data['sugestie'], key=lambda x: x['vote_start'], reverse=True),
+        reversed(database.data['sugestie']),
       )),
       callback,
       interaction.user,
@@ -347,7 +349,7 @@ def setup(_bot):
           value=sugestia['id'],
           description=format_datetime(sugestia['vote_start']),
         ),
-        filter(is_pending, database.data['sugestie']),
+        filter(is_pending, reversed(database.data['sugestie'])),
       )),
       callback,
       interaction.user,
@@ -381,7 +383,7 @@ def setup(_bot):
           description=format_datetime(sugestia['vote_start']),
           emoji=emoji_status_of(sugestia),
         ),
-        filter(is_annullable, database.data['sugestie'])
+        filter(is_annullable, reversed(database.data['sugestie'])),
       )),
       callback,
       interaction.user,
@@ -411,7 +413,7 @@ def setup(_bot):
           description=format_datetime(sugestia['vote_start']),
           emoji=emoji_status_of(sugestia),
         ),
-        filter(is_eraseable_in(interaction), database.data['sugestie']),
+        filter(is_eraseable_in(interaction), reversed(database.data['sugestie'])),
       )),
       callback,
       interaction.user,

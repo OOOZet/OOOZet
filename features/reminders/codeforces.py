@@ -18,7 +18,7 @@ import asyncio, discord, logging, requests
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from common import config, mention_datetime, parse_duration
+from common import config, escape, mention_datetime, parse_duration
 
 def setup(bot):
   @dataclass
@@ -49,7 +49,7 @@ def setup(bot):
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
+    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{escape(contest.title)}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
 
   async def send_national_standings(contest):
     logging.info(f'Sending national standings for Codeforces contest {contest.id}')
@@ -102,7 +102,7 @@ def setup(bot):
 
       line = f'{len(lines) + 1}. #{entry["rank"]} '
       # contest.standings/contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
-      line += ', '.join(f'[{user_infos[i]["handle"]}](https://codeforces.com/profile/{user_infos[i]["handle"]})' for i in team)
+      line += ', '.join(f'[{escape(user_infos[i]["handle"])}](https://codeforces.com/profile/{user_infos[i]["handle"]})' for i in team)
       if len(team) == 1 and team[0] in rating_changes:
         old = rating_changes[team[0]]["oldRating"]
         new = rating_changes[team[0]]["newRating"]
@@ -117,7 +117,7 @@ def setup(bot):
 
     await bot.wait_until_ready()
     channel = bot.get_channel(config['codeforces_channel'])
-    header = f'Ranking zawodników z Polski w [{contest.title}]({contest.link}): 🏆 🇵🇱\n'
+    header = f'Ranking zawodników z Polski w [{escape(contest.title)}]({contest.link}): 🏆 🇵🇱\n'
 
     if not lines:
       await channel.send(header, suppress_embeds=True)

@@ -48,7 +48,7 @@ class Server(http.server.HTTPServer):
     super().__init__(('0.0.0.0', config['websub_port']), HttpRequestHandler)
 
     self.hub = 'https://pubsubhubbub.appspot.com/'
-    self.topic = f'https://www.youtube.com/feeds/videos.xml?channel_id={config["oki_youtube"]}'
+    self.topic = f'https://www.youtube.com/xml/feeds/videos.xml?channel_id={config["oki_youtube"]}' # The official documentation is wrong about this.
 
     self.callback = f'http://{config["websub_host"]}:{config["websub_port"]}/{token_urlsafe()}'
     self.secret = token_urlsafe() # Some hubs fail with token_bytes.
