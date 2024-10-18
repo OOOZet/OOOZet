@@ -138,9 +138,6 @@ def mention_message(client, channel, msg):
 def debacktick(string):
   return string.replace('`', '')
 
-def escape(string):
-  return string.translate({ord(i): '\\' + i for i in '#*-.>[\\_`~'})
-
 def select_view(select_options, callback, owner):
   view = discord.ui.View()
   async def interaction_check(interaction):

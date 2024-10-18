@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
 
 import database
-from common import config, escape, mention_datetime, parse_duration
+from common import config, mention_datetime, parse_duration
 from features.reminders import websub
 
 def setup(bot):
@@ -49,9 +49,9 @@ def setup(bot):
     mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
     if video.is_livestream:
       relative_time = mention_datetime(video.time, relative=True)
-      announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{escape(video.title)}]({video.link})! 🔔'
+      announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{video.title}]({video.link})! 🔔'
     else:
-      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{escape(video.title)}]({video.link})! 🔔'
+      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.title}]({video.link})! 🔔'
     await bot.wait_until_ready()
     await bot.get_channel(config['oki_channel']).send(announcement)
 

@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from common import config, escape, mention_datetime, parse_duration
+from common import config, mention_datetime, parse_duration
 
 def setup(bot):
   @dataclass
@@ -50,7 +50,7 @@ def setup(bot):
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['atcoder_channel']).send(f'{mention} [{escape(contest.title)}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
+    await bot.get_channel(config['atcoder_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
 
   reminders = []
 
