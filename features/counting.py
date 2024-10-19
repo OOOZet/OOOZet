@@ -20,7 +20,7 @@ from datetime import datetime
 import database
 from common import config
 
-def setup(bot):
+async def setup(bot):
   lock = asyncio.Lock()
 
   async def clean():

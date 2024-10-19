@@ -30,7 +30,7 @@ def check_rules(interaction):
   if not database.data.get('rules', []):
     raise NoRulesError()
 
-def setup(bot):
+async def setup(bot):
   @bot.on_check_failure
   async def on_check_failure(interaction, error):
     if isinstance(error, NoRulesError):

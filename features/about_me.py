@@ -20,7 +20,7 @@ from io import StringIO
 
 from common import redacted_config
 
-def setup(bot):
+async def setup(bot):
   setup_time = datetime.now().astimezone()
 
   @bot.tree.command(description='Wyświetla konfigurację bota')

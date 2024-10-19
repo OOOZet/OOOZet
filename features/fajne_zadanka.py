@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, os, re, requests
+import aiohttp, asyncio, discord, logging, os, re
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -24,7 +24,19 @@ from urllib.parse import unquote, urlparse
 import database
 from common import config, parse_duration
 
-def find_problem(url):
+async def fetch_html(url):
+  async with aiohttp.ClientSession() as session:
+    response = await session.get(url)
+    response.raise_for_status()
+    return BeautifulSoup(await response.text(), 'lxml')
+
+async def fetch_json(url):
+  async with aiohttp.ClientSession() as session:
+    response = await session.get(url)
+    response.raise_for_status()
+    return await response.json()
+
+async def find_problem(url):
   url = urlparse(unquote(url))
   path = os.path.normpath(url.path).replace('//', '/')
 
@@ -33,54 +45,43 @@ def find_problem(url):
        (match := re.fullmatch('/problemset/problem/([0-9]+)/([A-Za-z0-9]+)', path)):
       contest = int(match[1])
       letter = match[2].upper()
-      response = requests.get(f'https://codeforces.com/api/contest.standings?contestId={contest}&count=1', timeout=parse_duration(config['codeforces_timeout']))
-      response.raise_for_status()
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}&count=1')
       return (
         'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}/problem/{letter}',
-        next(i['name'] for i in response.json()['result']['problems'] if i['index'] == letter),
+        next(i['name'] for i in json['result']['problems'] if i['index'] == letter),
       )
 
     elif match := re.match('/(?:contest|gym)/([0-9]+)', path):
       contest = int(match[1])
-      response = requests.get(f'https://codeforces.com/api/contest.standings?contestId={contest}&count=1', timeout=parse_duration(config['codeforces_timeout']))
-      response.raise_for_status()
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}&count=1')
       return (
         'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}',
-        response.json()['result']['contest']['name'],
+        json['result']['contest']['name'],
       )
 
   elif url.hostname == 'atcoder.jp':
     if match := re.match('/contests/([^/]+)/tasks/([^/]+)', path):
       url = f'https://atcoder.jp/contests/{match[1].lower()}/tasks/{match[2].lower()}'
-      response = requests.get(url, timeout=parse_duration(config['atcoder_timeout']))
-      response.raise_for_status()
-      return url, BeautifulSoup(response.text, 'lxml').head.title.text.partition(' - ')[2]
+      return url, (await fetch_html(url)).head.title.text.partition(' - ')[2]
 
     elif match := re.match('/contests/([^/]+)', path):
       url = f'https://atcoder.jp/contests/{match[1].lower()}'
-      response = requests.get(url, timeout=parse_duration(config['atcoder_timeout']))
-      response.raise_for_status()
-      return url, BeautifulSoup(response.text, 'lxml').find(class_='contest-title').text
+      return url, (await fetch_html(url)).find(class_='contest-title').text
 
   elif url.hostname == 'szkopul.edu.pl':
     if match := re.match('/problemset/problem/([^/]+)/site', path):
       url = f'https://szkopul.edu.pl/problemset/problem/{match[1]}/site'
-      response = requests.get(url, timeout=parse_duration(config['szkopul_timeout']))
-      response.raise_for_status()
-      return url, BeautifulSoup(response.text, 'lxml').find(class_='problem-title').h1.text.rpartition(' (')[0]
+      return url, (await fetch_html(url)).find(class_='problem-title').h1.text.rpartition(' (')[0]
 
   elif url.hostname == 'oj.uz':
     if match := re.match('/problem/[a-z]+/([^/]+)', path):
-      url = f'https://oj.uz/problem/view/{match[1]}'
-      response = requests.get(url, timeout=parse_duration(config['ojuz_timeout']))
-      response.raise_for_status()
-      soup = BeautifulSoup(response.text, 'lxml')
+      html = await fetch_html(f'https://oj.uz/problem/view/{match[1]}')
       return (
-        'https://oj.uz' + soup.find(lambda x: x.name == 'a' and x.text == 'Statement')['href'],
-        next(soup.find(class_='problem-title').h1.strings).strip(),
+        'https://oj.uz' + html.find(lambda x: x.name == 'a' and x.text == 'Statement')['href'],
+        next(html.find(class_='problem-title').h1.strings).strip(),
       )
 
-def setup(bot):
+async def setup(bot):
   lock = asyncio.Lock()
 
   async def clean():
@@ -115,7 +116,7 @@ def setup(bot):
           continue
 
         try:
-          url, title = find_problem(url) or (url, url)
+          url, title = await find_problem(url) or (url, url)
         except:
           logging.exception('Got exception while finding problem metadata')
           title = url

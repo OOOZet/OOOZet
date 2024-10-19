@@ -23,18 +23,18 @@ from features.reminders import atcoder, codeforces, youtube
 
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
-    about_me.setup(self)
-    atcoder.setup(self)
-    codeforces.setup(self)
-    counting.setup(self)
-    fajne_zadanka.setup(self)
-    misc.setup(self)
-    rules.setup(self)
-    sugestie.setup(self)
-    utils.setup(self)
-    warns.setup(self)
-    xp.setup(self)
-    youtube.setup(self)
+    await about_me.setup(self)
+    await atcoder.setup(self)
+    await codeforces.setup(self)
+    await counting.setup(self)
+    await fajne_zadanka.setup(self)
+    await misc.setup(self)
+    await rules.setup(self)
+    await sugestie.setup(self)
+    await utils.setup(self)
+    await warns.setup(self)
+    await xp.setup(self)
+    await youtube.setup(self)
 
     if not options['debug']:
       await self.tree.sync()

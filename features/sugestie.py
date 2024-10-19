@@ -262,7 +262,7 @@ def check_eraseable(interaction):
   if not any(map(is_eraseable_in(interaction), database.data.get('sugestie', []))):
     raise NoSugestieError(NoSugestieError.Filter.Eraseable)
 
-def setup(_bot):
+async def setup(_bot):
   global bot
   bot = _bot
 

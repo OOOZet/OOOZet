@@ -34,7 +34,7 @@ def check_staff_nonempty(interaction):
   if all(not bot.get_guild(config['guild']).get_role(i).members for i in config['staff_roles']):
     raise NoStaffError()
 
-def setup(_bot):
+async def setup(_bot):
   global bot
   bot = _bot
 

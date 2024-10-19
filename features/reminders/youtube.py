@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, logging, requests
+import aiohttp, asyncio, logging, requests
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
@@ -23,7 +23,7 @@ import database
 from common import config, mention_datetime, parse_duration
 from features.reminders import websub
 
-def setup(bot):
+async def setup(bot):
   @dataclass
   class YouTubeVideo:
     id: str
@@ -113,12 +113,12 @@ def setup(bot):
 
   try:
     logging.info("Downloading OKI's YouTube channel feed")
-    response = requests.get(
-      f'https://www.youtube.com/feeds/videos.xml?channel_id={config["oki_youtube"]}',
-      timeout=parse_duration(config['youtube_timeout']),
-    )
-    response.raise_for_status()
-    process_youtube_feed(response.text)
+
+    async with aiohttp.ClientSession() as session:
+      response = await session.get(f'https://www.youtube.com/feeds/videos.xml?channel_id={config["oki_youtube"]}')
+      response.raise_for_status()
+      process_youtube_feed(await response.text())
+
     logging.info("Processed OKI's YouTube channel feed")
   except Exception as e:
     logging.exception('Got exception while downloading YouTube channel feed')

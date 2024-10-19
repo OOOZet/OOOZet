@@ -14,13 +14,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, requests
+import aiohttp, asyncio, discord, logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from common import config, mention_datetime, parse_duration
 
-def setup(bot):
+async def setup(bot):
   @dataclass
   class Contest:
     id: int
@@ -57,8 +57,8 @@ def setup(bot):
     if config['codeforces_channel'] is None:
       return
 
-    response = requests.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}', timeout=parse_duration(config['codeforces_timeout']))
-    json = response.json()
+    async with aiohttp.ClientSession() as session:
+      json = await (await session.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}')).json()
     if json['status'] != 'OK':
       if json['comment'] != 'contestId: Rating changes are unavailable for this contest':
         logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
@@ -68,8 +68,8 @@ def setup(bot):
       return True
     rating_changes = {i['handle']: i for i in json.get('result', [])}
 
-    response = requests.get(f'https://codeforces.com/api/contest.standings?contestId={contest.id}&participantTypes=CONTESTANT,OUT_OF_COMPETITION', timeout=parse_duration(config['codeforces_timeout']))
-    standings = response.json()
+    async with aiohttp.ClientSession() as session:
+      standings = await (await session.get(f'https://codeforces.com/api/contest.standings?contestId={contest.id}&participantTypes=CONTESTANT,OUT_OF_COMPETITION')).json()
     if standings['status'] != 'OK':
       logging.error(f'Codeforces contest standings request failed: {standings["comment"]!r}')
       return True
@@ -83,8 +83,8 @@ def setup(bot):
     for i in range(0, len(handles), 600):
       batch = handles[i : i + 600]
 
-      response = requests.get('https://codeforces.com/api/user.info?handles=' + ';'.join(batch), timeout=parse_duration(config['codeforces_timeout']))
-      json = response.json()
+      async with aiohttp.ClientSession() as session:
+        json = await (await session.get('https://codeforces.com/api/user.info?handles=' + ';'.join(batch))).json()
       if json['status'] != 'OK':
         logging.error(f'Codeforces user info request failed: {json["comment"]!r}')
         return True
@@ -141,9 +141,8 @@ def setup(bot):
   async def poll():
     logging.info('Periodically downloading Codeforces contest list')
 
-    response = requests.get('https://codeforces.com/api/contest.list', timeout=parse_duration(config['codeforces_timeout']))
-    response.raise_for_status()
-    json = response.json()
+    async with aiohttp.ClientSession() as session:
+      json = await (await session.get('https://codeforces.com/api/contest.list')).json()
     if json['status'] != 'OK':
       logging.error(f'Codeforces contest list request failed: {json["comment"]!r}')
       return

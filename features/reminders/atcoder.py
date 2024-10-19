@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, requests
+import aiohttp, asyncio, discord, logging
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from common import config, mention_datetime, parse_duration
 
-def setup(bot):
+async def setup(bot):
   @dataclass
   class Contest:
     id: str
@@ -58,9 +58,10 @@ def setup(bot):
   async def poll():
     logging.info('Periodically downloading AtCoder contest schedule')
 
-    response = requests.get('https://atcoder.jp/contests/', timeout=parse_duration(config['atcoder_timeout']))
-    response.raise_for_status()
-    html = BeautifulSoup(response.text, 'lxml').find(id='contest-table-upcoming').tbody.find_all('tr')
+    async with aiohttp.ClientSession() as session:
+      response = await session.get('https://atcoder.jp/contests/')
+      response.raise_for_status()
+      html = BeautifulSoup(await response.text(), 'lxml').find(id='contest-table-upcoming').tbody.find_all('tr')
 
     for task in reminders:
       task.cancel()

@@ -67,23 +67,18 @@ config = {
   'oki_youtube': 'UCw1Z4iA0T-QNaJ-sEOXeYCw', # ID (a nie nazwa użytkownika) kanału YouTube
   'youtube_advance': '5m',                   # Wyprzedzenie, z którym są wysyłane ogłoszenia o transmisjach
   'youtube_api_key': None,                   # Klucz dewelopera do API YouTube
-  'youtube_timeout': '1m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera YouTube
 
   'codeforces_channel': None,                # Kanał, na który są wysyłane przypomnienia o rundach na Codeforces
   'codeforces_role': None,                   # Rola, która jest pingowana w przypomnieniach o rundach
   'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
   'codeforces_poll_rate': '1h',              # Częstotliwość aktualizowania listy rund
-  'codeforces_timeout': '5m',                # Maksymalny czas oczekiwania na odpowiedź od serwera Codeforces
 
   'atcoder_channel': None,                   # Kanał, na który są wysyłane przypomnienia o kontestach na AtCoder
   'atcoder_role': None,                      # Rola, która jest pingowana w przypomnieniach o kontestach
   'atcoder_advance': '15m',                  # Wyprzedzenie, z którym są wysyłane przypomnienia o kontestach
   'atcoder_poll_rate': '1d',                 # Częstotliwość aktualizowania listy kontestów
-  'atcoder_timeout': '5m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera AtCoder
 
   'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
-  'szkopul_timeout': '5m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera Szkopuł
-  'ojuz_timeout': '5m',                      # Maksymalny czas oczekiwania na odpowiedź od serwera oj.uz
 }
 
 def redacted_config():

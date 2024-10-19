@@ -54,7 +54,7 @@ async def update_roles():
   for member in bot.get_guild(config['guild']).members:
     await update_roles_for(member)
 
-def setup(_bot):
+async def setup(_bot):
   global bot
   bot = _bot
 

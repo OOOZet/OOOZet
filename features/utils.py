@@ -32,7 +32,7 @@ def check_staff(action=None): # "… uprawnień do {action}, …"
       raise NotStaffError(action)
   return pred
 
-def setup(bot):
+async def setup(bot):
   @bot.on_check_failure
   async def on_check_failure(interaction, error):
     if isinstance(error, NotStaffError):
