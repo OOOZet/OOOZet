@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ import asyncio, discord, discord.ext.commands, logging, random, threading
 
 import console
 from common import config, options
-from features import about_me, counting, misc, rules, sugestie, utils, warns, xp
+from features import about_me, counting, fajne_zadanka, misc, rules, sugestie, utils, warns, xp
 from features.reminders import atcoder, codeforces, youtube
 
 class Client(discord.ext.commands.Bot):
@@ -27,6 +27,7 @@ class Client(discord.ext.commands.Bot):
     atcoder.setup(self)
     codeforces.setup(self)
     counting.setup(self)
+    fajne_zadanka.setup(self)
     misc.setup(self)
     rules.setup(self)
     sugestie.setup(self)

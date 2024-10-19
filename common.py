@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -80,6 +80,10 @@ config = {
   'atcoder_advance': '15m',                  # Wyprzedzenie, z którym są wysyłane przypomnienia o kontestach
   'atcoder_poll_rate': '1d',                 # Częstotliwość aktualizowania listy kontestów
   'atcoder_timeout': '5m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera AtCoder
+
+  'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
+  'szkopul_timeout': '5m',                   # Maksymalny czas oczekiwania na odpowiedź od serwera Szkopuł
+  'ojuz_timeout': '5m',                      # Maksymalny czas oczekiwania na odpowiedź od serwera oj.uz
 }
 
 def redacted_config():

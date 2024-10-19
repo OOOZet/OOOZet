@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -295,7 +295,7 @@ def setup(_bot):
 
   @bot.listen()
   async def on_message(msg):
-    if config['sugestie_channel'] is not None and msg.channel.id == config['sugestie_channel'] and msg.author != bot.user:
+    if msg.channel.id == config['sugestie_channel'] and msg.author != bot.user:
       logging.info('Cleaning #sugestie after a new message')
       await clean() # Same pattern as in counting.py
 

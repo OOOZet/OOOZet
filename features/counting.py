@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -59,6 +59,6 @@ def setup(bot):
 
   @bot.listen()
   async def on_message(msg):
-    if config['counting_channel'] is not None and msg.channel.id == config['counting_channel']:
+    if msg.channel.id == config['counting_channel']:
       logging.info('Cleaning #counting after a new message')
       await clean() # on_message can come before on_ready.
