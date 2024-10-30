@@ -79,6 +79,10 @@ config = {
   'atcoder_poll_rate': '1d',                 # Częstotliwość aktualizowania listy kontestów
 
   'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
+
+  'help_forum_channel': None,                # Forum, na którym użytkownicy pytają o pomoc z zadaniami
+  'help_forum_ping_channel': None,           # Kanał, na który są wysyłane wezwania do pomocy na forum
+  'help_forum_ping_role': None,              # Rola, która jest pingowana w wezwaniach do pomocy na forum
 }
 
 def redacted_config():
