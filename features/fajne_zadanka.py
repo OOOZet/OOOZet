@@ -115,6 +115,13 @@ async def setup(bot):
           )
           continue
 
+        if not description:
+          await msg.author.send(
+            f'Twoja wiadomość musi zaczynać się lub konczyć krótkim opisem zadania (trudność i wymagane algorytmy), abyś mógł ją wysłać na {msg.channel.mention}. 🤓',
+            file=discord.File(StringIO(msg.content), 'message.md'),
+          )
+          continue
+
         try:
           url, title = await find_problem(url) or (url, url)
         except:
