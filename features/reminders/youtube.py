@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, logging, requests
+import aiohttp, asyncio, logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
@@ -39,8 +39,7 @@ async def setup(bot):
     if video.is_livestream:
       time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
       logging.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
-      delay = (time - datetime.now().astimezone()).total_seconds()
-      await asyncio.sleep(delay)
+      await asyncio.sleep((time - datetime.now().astimezone()).total_seconds())
       logging.info(f'Reminding about YouTube livestream {video.id}')
 
     if config['oki_channel'] is None:
@@ -55,7 +54,9 @@ async def setup(bot):
     await bot.wait_until_ready()
     await bot.get_channel(config['oki_channel']).send(announcement)
 
-  def parse_youtube_feed(content):
+  reminders = {}
+
+  async def process_youtube_feed(content):
     ns = {'atom': 'http://www.w3.org/2005/Atom', 'yt': 'http://www.youtube.com/xml/schemas/2015'}
     videos = [
       YouTubeVideo(
@@ -67,14 +68,12 @@ async def setup(bot):
       for i in ElementTree.fromstring(content).findall('atom:entry', ns)
     ]
 
-    response = requests.get(
-      f'https://youtube.googleapis.com/youtube/v3/videos?key={config["youtube_api_key"]}&part=liveStreamingDetails' + ''.join(f'&id={i.id}' for i in videos),
-      timeout=parse_duration(config['youtube_timeout']),
-    )
-    if not response.ok:
-      logging.error(f'YouTube API request failed with {response.status_code}: {response.text!r}')
-      return
-    json = response.json()
+    async with aiohttp.ClientSession() as session:
+      response = await session.get(f'https://youtube.googleapis.com/youtube/v3/videos?key={config["youtube_api_key"]}&part=liveStreamingDetails' + ''.join(f'&id={i.id}' for i in videos))
+      if not response.ok:
+        logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
+        return
+      json = await response.json()
 
     to_remove = []
     for i, video in enumerate(videos):
@@ -87,40 +86,35 @@ async def setup(bot):
     for video in to_remove:
       videos.remove(video)
 
-    return videos
-
-  reminders = []
-
-  def process_youtube_feed(content):
     if 'oki_last_published' not in database.data:
       logging.info("OKI's YouTube channel has never been checked before")
       database.data['oki_last_published'] = datetime.now().astimezone()
       database.should_save = True
 
-    for task in reminders:
-      task.cancel()
-    reminders.clear()
-
     last_published = database.data['oki_last_published']
-    for video in parse_youtube_feed(content):
-      if video.is_livestream and video.time > datetime.now().astimezone():
-        reminders.append(asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop))
-      elif not video.is_livestream and video.time > last_published:
-        reminders.append(asyncio.run_coroutine_threadsafe(remind_oki(video), bot.loop))
+    for video in videos:
+      if not (video.is_livestream and video.time > datetime.now().astimezone()) and not (not video.is_livestream and video.time > last_published):
+        continue
+
+      try:
+        reminders[video.id].cancel()
+      except KeyError:
+        pass
+      reminders[video.id] = asyncio.create_task(remind_oki(video))
+
+      if not video.is_livestream:
         with database.lock:
           database.data['oki_last_published'] = max(database.data['oki_last_published'], video.time)
           database.should_save = True
 
   try:
     logging.info("Downloading OKI's YouTube channel feed")
-
     async with aiohttp.ClientSession() as session:
       response = await session.get(f'https://www.youtube.com/feeds/videos.xml?channel_id={config["oki_youtube"]}')
       response.raise_for_status()
-      process_youtube_feed(await response.text())
-
+      await process_youtube_feed(await response.text())
     logging.info("Processed OKI's YouTube channel feed")
   except Exception as e:
     logging.exception('Got exception while downloading YouTube channel feed')
 
-  websub.on_msg = process_youtube_feed
+  websub.on_msg = lambda feed: asyncio.run_coroutine_threadsafe(process_youtube_feed(feed), bot.loop)
