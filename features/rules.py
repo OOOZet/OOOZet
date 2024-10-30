@@ -72,15 +72,58 @@ async def setup(bot):
     ), ephemeral=True)
 
   def fragment_text(string):
-    fragment = []
+    lines = []
+    list_num = None
     for line in string.splitlines():
-      line = line or '_ _'
-      if (line == '_ _' or line.startswith('#')) and fragment and fragment[-1] != '_ _':
-        yield '\n'.join(fragment)
-        fragment = []
-      fragment.append(line)
-    if fragment:
-      yield '\n'.join(fragment)
+      line = (line or '_ _') + '\n'
+
+      if line.partition('. ')[0].isdecimal() and line.partition('. ')[0].isascii():
+        num, _, item = line.partition('. ')
+        num = int(num)
+        if list_num is None:
+          list_num = num
+        else:
+          list_num += 1
+          line = f'{list_num}. {item}'
+        if lines:
+          lines[-1].append(line)
+        else:
+          lines.append([line])
+
+      elif line.startswith(' ') and lines:
+        lines[-1][-1] += line
+
+      elif (line == '_ _\n' or line.startswith('#')) and not (lines and lines[-1][-1] == '_ _\n'):
+        lines.append([line])
+        list_num = None
+
+      else:
+        if lines:
+          lines[-1].append(line)
+        else:
+          lines.append([line])
+        list_num = None
+
+    while lines:
+      if len(lines[0][0]) > 2000:
+        yield lines[0][0]
+        del lines[0][0]
+        if not lines[0]:
+          del lines[0]
+
+      elif sum(map(len, lines[0])) > 2000:
+        fragment = ''
+        while len(fragment) + len(lines[0][0]) <= 2000:
+          fragment += lines[0][0]
+          del lines[0][0]
+        yield fragment
+
+      else:
+        fragment = ''
+        while lines and len(fragment) + sum(map(len, lines[0])) <= 2000:
+          fragment += ''.join(lines[0])
+          del lines[0]
+        yield fragment
 
   async def resend(interaction):
     if not interaction.response.is_done():
@@ -118,7 +161,7 @@ async def setup(bot):
       await interaction.response.send_message('Regulamin nie może być pusty… 🤨', ephemeral=True)
       return
     if any(len(i) > 2000 for i in fragment_text(text)):
-      await interaction.response.send_message('Regulamin nie może zawierać paragrafy dłuższe niż ~2000 znaków. 😊', ephemeral=True)
+      await interaction.response.send_message('Regulamin nie może zawierać linijki dłuższe niż ~2000 znaków. 😊', ephemeral=True)
       return
 
     if sum(map(sugestie.is_pending, database.data.get('sugestie', []))) < ile_sugestii:
