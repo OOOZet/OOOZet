@@ -47,11 +47,12 @@ config = {
   'xp_roles': [],                            # Role, które można dostać za poziomy, format to [<poziom>, <rola>]
   'xp_channel': None,                        # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
 
-  'sugestie_channel': None,                  # Kanal "#sugestie"
-  'sugestie_vote_role': None,                # Rola, która może głosować nad sugestiami
-  'sugestie_ping_role': None,                # Rola, która jest pingowana, gdy pojawia się nowa sugestia
-  'sugestie_vote_length': '2d',              # Czas na głosowanie nad sugestią
-  'sugestie_deciding_lead': 9,               # Przewaga, po której jedna z opcji wygrywa
+  'sugestie_channel': None,                  # Kanał "#sugestie"
+  'sugestie_role': None,                     # Rola, która może komentować i głosować nad sugestiami
+  'sugestie_review_ping_role': None,         # Rola, która jest pingowana, gdy pojawia się nowa sugestia
+  'sugestie_review_length': '1d',            # Czas na komentowanie sugestii
+  'sugestie_vote_ping_role': None,           # Rola, która jest pingowana, gdy zaczyna się głosowanie nad sugestią
+  'sugestie_vote_length': '1d',              # Czas na głosowanie nad sugestią
 
   'websub_host': None,                       # Adres tego serwera
   'websub_port': 13579,                      # Port, na którym będzie odpalony serwer WebSub

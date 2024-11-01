@@ -107,14 +107,14 @@ async def setup(_bot):
       await interaction2.response.defer()
 
     await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {member.mention}?', view=select_view(
-      list(map(
-        lambda warn: discord.SelectOption(
+      [
+        discord.SelectOption(
           label=limit_len(warn['reason']),
           value=id(warn),
           description=format_datetime(warn['time']),
-        ),
-        database.data['warns'][member.id],
-      )),
+        )
+        for warn in database.data['warns'][member.id]
+      ],
       callback,
       interaction.user,
     ))

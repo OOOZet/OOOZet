@@ -63,10 +63,10 @@ async def setup(bot):
       )
 
     await interaction.response.send_message('Którą wersję regulaminu chcesz zobaczyć?', view=select_view(
-      list(map(
-        lambda rules: discord.SelectOption(label=format_datetime(rules['time']), value=id(rules)),
-        database.data['rules'],
-      )),
+      [
+        discord.SelectOption(label=format_datetime(rules['time']), value=id(rules))
+        for rules in database.data['rules']
+      ],
       callback,
       interaction.user,
     ), ephemeral=True)

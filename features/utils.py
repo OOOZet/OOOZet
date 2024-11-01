@@ -19,6 +19,9 @@ from dataclasses import dataclass
 
 from common import config, hybrid_check
 
+def is_staff(member):
+  return any(member.get_role(i) is not None for i in config['staff_roles'])
+
 @dataclass
 class NotStaffError(discord.app_commands.CheckFailure):
   action: str
@@ -28,7 +31,7 @@ def check_staff(action=None): # "… uprawnień do {action}, …"
   def pred(interaction):
     if interaction.guild.id != config['guild']:
       return False # Asserts don't get caught in app command checks.
-    if all(interaction.user.get_role(i) is None for i in config['staff_roles']):
+    if not is_staff(interaction.user):
       raise NotStaffError(action)
   return pred
 
