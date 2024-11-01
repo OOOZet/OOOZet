@@ -298,10 +298,9 @@ async def update(sugestia):
 
 async def time_updates(sugestia):
   delay = (sugestia['review_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
-  if delay > 0:
-    logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
-    await asyncio.sleep(delay)
-    await update(sugestia)
+  logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
+  await asyncio.sleep(delay)
+  await update(sugestia)
 
   delay = (sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
   logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
