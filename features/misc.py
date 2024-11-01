@@ -52,7 +52,7 @@ async def setup(_bot):
     await interaction.response.defer(ephemeral=True)
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
-    await interaction.followup.send(f'Pomyślnie zaaktualizowano role za warny i XP dla {member.mention}. 👌')
+    await interaction.followup.send(f'Pomyślnie zaktualizowano role za warny i XP dla {member.mention}. 👌')
 
   @bot.listen()
   async def on_member_join(member):

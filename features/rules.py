@@ -140,7 +140,7 @@ async def setup(bot):
     for fragment in fragment_text(text):
       await channel.send(fragment)
 
-    await interaction.followup.send('Pomyślnie zaaktualizowano kanał z regulaminem. 🫡', ephemeral=True)
+    await interaction.followup.send('Pomyślnie zaktualizowano kanał z regulaminem. 🫡', ephemeral=True)
 
   @rules.command(name='resend', description='Aktualizuje kanał z regulaminem')
   @check_rules
@@ -209,7 +209,7 @@ async def setup(bot):
         select = discord.ui.Select()
         select.callback = callback
         for sugestia in filter(sugestie.is_pending, database.data['sugestie']):
-          select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['vote_start']))
+          select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['time']))
         view.add_item(select)
 
       submit = discord.ui.Button(style=discord.ButtonStyle.success, label='Zatwierdź')

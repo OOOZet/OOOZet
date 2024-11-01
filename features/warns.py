@@ -57,63 +57,66 @@ async def setup(_bot):
     else:
       raise
 
-  async def warn(interaction, member, reason):
-    logging.info(f'Adding warn for {member.id} with reason {reason!r}')
+  async def warn(interaction, user, reason):
+    logging.info(f'Adding warn for {user.id} with reason {reason!r}')
     warn = {
       'time': datetime.now().astimezone(),
       'reason': reason,
     }
-    database.data.setdefault('warns', {}).setdefault(member.id, []).append(warn)
+    database.data.setdefault('warns', {}).setdefault(user.id, []).append(warn)
     database.should_save = True
 
-    await update_roles_for(member)
+    if member := bot.get_guild(config['guild']).get_member(user.id):
+      await update_roles_for(member)
 
-    count = len(database.data['warns'][member.id])
-    await interaction.response.send_message(f'{member.mention} właśnie dostał swojego **{count}-ego** warna za `{debacktick(reason)}`! 😒')
+    count = len(database.data['warns'][user.id])
+    await interaction.response.send_message(f'{user.mention} właśnie dostał swojego **{count}-ego** warna za `{debacktick(reason)}`! 😒')
 
   @bot.tree.command(name='warn', description='Warnuje użytkownika')
   @discord.app_commands.guilds(config['guild'])
   @check_staff('warnowania')
-  async def cmd_warn(interaction, member: discord.Member, reason: str):
-    await warn(interaction, member, reason)
+  async def cmd_warn(interaction, user: discord.User, reason: str):
+    await warn(interaction, user, reason)
 
   @bot.tree.context_menu(name='Zwarnuj')
   @discord.app_commands.guilds(config['guild'])
   @check_staff('warnowania')
-  async def menu_warn(interaction, member: discord.Member):
+  async def menu_warn(interaction, user: discord.User):
     async def on_submit(interaction2):
-      await warn(interaction2, member, text_input.value)
+      await warn(interaction2, user, text_input.value)
 
     text_input = discord.ui.TextInput(label='Powód')
-    modal = discord.ui.Modal(title=f'Zwarnuj {member.our_name}')
+    modal = discord.ui.Modal(title=f'Zwarnuj {user.our_name}')
     modal.on_submit = on_submit
     modal.add_item(text_input)
     await interaction.response.send_modal(modal)
 
-  async def unwarn(interaction, member):
-    check_warns_for(member)
+  async def unwarn(interaction, user):
+    check_warns_for(user)
 
     async def callback(interaction2, choice):
-      warn = find(int(choice), database.data['warns'][member.id], proj=id)
+      warn = find(int(choice), database.data['warns'][user.id], proj=id)
 
-      logging.info(f'Removing warn for {member.id} with reason {warn["reason"]!r} from {warn["time"]}')
-      database.data['warns'][member.id].remove(warn)
+      logging.info(f'Removing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
+      database.data['warns'][user.id].remove(warn)
       database.should_save = True
-      await update_roles_for(member)
+
+      if member := bot.get_guild(config['guild']).get_member(user.id):
+        await update_roles_for(member)
 
       reason = debacktick(warn['reason'])
       time = mention_datetime(warn['time'])
-      await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia {time} użytkownikowi {member.mention}! 🥳', view=None)
+      await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia {time} użytkownikowi {user.mention}! 🥳', view=None)
       await interaction2.response.defer()
 
-    await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {member.mention}?', view=select_view(
+    await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {user.mention}?', view=select_view(
       [
         discord.SelectOption(
           label=limit_len(warn['reason']),
           value=id(warn),
           description=format_datetime(warn['time']),
         )
-        for warn in database.data['warns'][member.id]
+        for warn in database.data['warns'][user.id]
       ],
       callback,
       interaction.user,
@@ -122,14 +125,14 @@ async def setup(_bot):
   @bot.tree.command(name='unwarn', description='Odbiera warna użytkownikowi')
   @discord.app_commands.guilds(config['guild'])
   @check_staff('odbierania warnów')
-  async def cmd_unwarn(interaction, member: discord.Member):
-    await unwarn(interaction, member)
+  async def cmd_unwarn(interaction, user: discord.User):
+    await unwarn(interaction, user)
 
   @bot.tree.context_menu(name='Odbierz warna')
   @discord.app_commands.guilds(config['guild'])
   @check_staff('odbierania warnów')
-  async def menu_unwarn(interaction, member: discord.Member):
-    await unwarn(interaction, member)
+  async def menu_unwarn(interaction, user: discord.User):
+    await unwarn(interaction, user)
 
   async def warns(interaction, user):
     check_warns_for(user)
