@@ -284,7 +284,7 @@ async def update(sugestia):
     logging.warn(f'Sugestia {sugestia["id"]} is missing')
     return
 
-  buttonc_before = len(msg.components)
+  buttonc_before = sum(len(i.children) for i in msg.components)
 
   await msg.edit(view=view_for(sugestia))
 
