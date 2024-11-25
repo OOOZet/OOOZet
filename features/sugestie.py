@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from enum import auto, Enum
 
 import console, database
-from common import config, debacktick, find, format_datetime, hybrid_check, limit_len, mention_datetime, mention_message, parse_duration, select_view
+from common import config, debacktick, format_datetime, hybrid_check, limit_len, mention_datetime, mention_message, parse_duration, select_view, sleep_until
 from features.utils import check_staff, is_staff
 
 bot = None
@@ -35,7 +35,7 @@ def is_annullable(sugestia):
   return 'annulled' not in sugestia and 'done' not in sugestia
 
 def is_eraseable_in(interaction):
-  return lambda sugestia: (sugestia['author'] == interaction.user.id or is_staff(interaction)) and 'done' not in sugestia
+  return lambda sugestia: (sugestia['author'] == interaction.user.id or is_staff(interaction.user)) and 'done' not in sugestia
 
 def emoji_status_of(sugestia):
   if 'annulled' in sugestia:
@@ -297,14 +297,14 @@ async def update(sugestia):
         await (await msg.channel.send(f'<@&{config["sugestie_vote_ping_role"]}>')).delete()
 
 async def time_updates(sugestia):
-  delay = (sugestia['review_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
-  logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
-  await asyncio.sleep(delay)
+  time = sugestia['review_end'] - timedelta(seconds=5) # 5 seconds to make sure the if passes.
+  logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
+  await sleep_until(time)
   await update(sugestia)
 
-  delay = (sugestia['vote_end'] - datetime.now().astimezone()).total_seconds() + 5 # 5 seconds to make sure the if passes.
-  logging.info(f'Waiting {delay} seconds to update sugestia {sugestia["id"]}')
-  await asyncio.sleep(delay)
+  time = sugestia['vote_end'] - timedelta(seconds=5) # 5 seconds to make sure the if passes.
+  logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
+  await sleep_until(time)
   await update(sugestia)
 
 cleaning_lock = asyncio.Lock()
@@ -424,7 +424,7 @@ async def setup(_bot):
   @check_any
   async def show(interaction):
     async def callback(interaction2, choice):
-      sugestia = find(int(choice), database.data['sugestie'], proj=lambda x: x['id'])
+      sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
       embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
       await interaction2.response.send_message(embed=embed, ephemeral=True)
 
@@ -447,7 +447,7 @@ async def setup(_bot):
   @check_staff('wykonywania sugestii')
   async def done(interaction, changes: str):
     async def callback(interaction2, choice):
-      sugestia = find(int(choice), filter(is_pending, database.data['sugestie']), proj=lambda x: x['id'])
+      sugestia = next(i for i in filter(is_pending, database.data['sugestie']) if i['id'] == int(choice))
 
       logging.info(f'{interaction2.user.id} has marked sugestia {sugestia["id"]} as done')
       sugestia['done'] = {
@@ -478,7 +478,7 @@ async def setup(_bot):
   @check_staff('unieważniania sugestii')
   async def annul(interaction, reason: str):
     async def callback(interaction2, choice):
-      sugestia = find(int(choice), filter(is_annullable, database.data['sugestie']), proj=lambda x: x['id'])
+      sugestia = next(i for i in filter(is_annullable, database.data['sugestie']) if i['id'] == int(choice))
 
       logging.info(f'{interaction2.user.id} has annulled sugestia {sugestia["id"]}')
       sugestia['annulled'] = {
@@ -511,7 +511,7 @@ async def setup(_bot):
   @check_eraseable
   async def erase(interaction):
     async def callback(interaction2, choice):
-      sugestia = find(int(choice), filter(is_eraseable_in(interaction2), database.data['sugestie']), proj=lambda x: x['id'])
+      sugestia = next(i for i in filter(is_eraseable_in(interaction2), database.data['sugestie']) if i['id'] == int(choice))
 
       logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
       database.data['sugestie'].remove(sugestia)

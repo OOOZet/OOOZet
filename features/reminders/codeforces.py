@@ -35,11 +35,10 @@ async def setup(bot):
     def is_niche(self):
       return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4', 'Hello', 'Good Bye', 'Global'])
 
-  async def remind(contest, delay=0):
-    if delay > 0:
-      logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
-      await asyncio.sleep(delay)
-      logging.info(f'Reminding about Codeforces contest {contest.id}')
+  async def remind(contest, delay):
+    logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
+    await asyncio.sleep(delay)
+    logging.info(f'Reminding about Codeforces contest {contest.id}')
 
     if config['codeforces_channel'] is None:
       return

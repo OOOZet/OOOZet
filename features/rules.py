@@ -18,7 +18,7 @@ import discord, logging
 from io import StringIO
 
 import database
-from common import config, find, format_datetime, hybrid_check, limit_len, mention_datetime, select_view
+from common import config, format_datetime, hybrid_check, limit_len, mention_datetime, select_view
 from features import sugestie
 from features.utils import check_staff
 
@@ -55,7 +55,7 @@ async def setup(bot):
   @check_rules
   async def history(interaction):
     async def callback(interaction2, choice):
-      result = find(int(choice), database.data['rules'], proj=id)
+      result = next(i for i in database.data['rules'] if id(i) == int(choice))
       await interaction2.response.send_message(
         f'Załączam regulamin z dnia {mention_datetime(result["time"])}. 😉',
         file=discord.File(StringIO(result['text'] + '\n'), 'rules.md'),

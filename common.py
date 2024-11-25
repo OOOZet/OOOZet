@@ -14,7 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, json, logging
+import asyncio, discord, json, logging
+from datetime import datetime
 
 options = {
   'config': 'config.json',
@@ -187,9 +188,6 @@ def select_view(select_options, callback, owner):
 
   return view
 
-def find(value, iterable, *, proj=lambda x: x):
-  return next(filter(lambda x: proj(x) == value, iterable))
-
 def hybrid_check(pred):
   def our_pred(interaction):
     if pred(interaction) is False:
@@ -206,3 +204,7 @@ discord.User.our_name = discord.Member.our_name = property(fget=lambda self: sel
 
 def limit_len(string): # Used primarily for labels in select views
   return string if len(string) <= 100 else string[:99] + '…'
+
+async def sleep_until(time):
+  while (now := datetime.now().astimezone()) < time:
+    await asyncio.sleep(min((time - now).total_seconds(), 3 * 60))

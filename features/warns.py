@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import console, database
-from common import config, debacktick, find, format_datetime, limit_len, mention_datetime, select_view
+from common import config, debacktick, format_datetime, limit_len, mention_datetime, select_view
 from features.utils import check_staff
 
 bot = None
@@ -95,7 +95,7 @@ async def setup(_bot):
     check_warns_for(user)
 
     async def callback(interaction2, choice):
-      warn = find(int(choice), database.data['warns'][user.id], proj=id)
+      warn = next(i for i in database.data['warns'][user.id] if id(i) == int(choice))
 
       logging.info(f'Removing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
       database.data['warns'][user.id].remove(warn)

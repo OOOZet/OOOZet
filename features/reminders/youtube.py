@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
 
 import database
-from common import config, mention_datetime, parse_duration
+from common import config, mention_datetime, parse_duration, sleep_until
 from features.reminders import websub
 
 async def setup(bot):
@@ -39,7 +39,7 @@ async def setup(bot):
     if video.is_livestream:
       time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
       logging.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
-      await asyncio.sleep((time - datetime.now().astimezone()).total_seconds())
+      await sleep_until(time)
       logging.info(f'Reminding about YouTube livestream {video.id}')
 
     if config['oki_channel'] is None:

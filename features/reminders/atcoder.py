@@ -17,9 +17,9 @@
 import aiohttp, asyncio, discord, logging
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 
-from common import config, mention_datetime, parse_duration
+from common import config, mention_datetime, parse_duration, sleep_until
 
 async def setup(bot):
   @dataclass
@@ -36,11 +36,11 @@ async def setup(bot):
     def is_niche(self):
       return all(i not in self.title for i in ['Beginner', 'Regular', 'Grand'])
 
-  async def remind(contest, delay=0):
-    if delay > 0:
-      logging.info(f'Setting reminder for AtCoder contest {contest.id} for {delay} seconds')
-      await asyncio.sleep(delay)
-      logging.info(f'Reminding about AtCoder contest {contest.id}')
+  async def remind(contest):
+    time = contest.time - timedelta(seconds=parse_duration(config['atcoder_advance']))
+    logging.info(f'Setting reminder for AtCoder contest {contest.id} for {time}')
+    await sleep_until(time)
+    logging.info(f'Reminding about AtCoder contest {contest.id}')
 
     if config['atcoder_channel'] is None:
       return
@@ -75,8 +75,7 @@ async def setup(bot):
         datetime.fromisoformat(entry[0].text),
       )
 
-      delay = (contest.time - datetime.now().astimezone()).total_seconds() - parse_duration(config['atcoder_advance'])
-      if delay > 0:
-        reminders.append(asyncio.create_task(remind(contest, delay)))
+      if datetime.now().astimezone() < contest.time:
+        reminders.append(asyncio.create_task(remind(contest)))
 
   poll.start()
