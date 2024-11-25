@@ -442,6 +442,28 @@ async def setup(_bot):
       interaction.user,
     ), ephemeral=True)
 
+  @sugestie.command(description='Wyświetla sugestię czekająca na wykonanie')
+  @check_pending
+  async def pending(interaction):
+    async def callback(interaction2, choice):
+      sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
+      embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+      await interaction2.response.send_message(embed=embed, ephemeral=True)
+
+    await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
+      [
+        discord.SelectOption(
+          label=limit_len(sugestia['text']),
+          value=sugestia['id'],
+          description=format_datetime(sugestia['time']),
+          emoji=emoji_status_of(sugestia),
+        )
+        for sugestia in filter(is_pending, reversed(database.data['sugestie']))
+      ],
+      callback,
+      interaction.user,
+    ), ephemeral=True)
+
   @sugestie.command(description='Oznacza sugestię jako wykonaną')
   @check_pending
   @check_staff('wykonywania sugestii')
