@@ -33,7 +33,7 @@ async def setup(bot):
 
     @property
     def is_niche(self):
-      return all(i not in self.title for i in ['Div. 1', 'Div. 2', 'Div. 3', 'Div. 4', 'Hello', 'Good Bye', 'Global'])
+      return all(i not in self.title for i in ['Round', 'Hello', 'Good Bye'])
 
   async def remind(contest, delay):
     logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
