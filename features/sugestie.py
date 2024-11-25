@@ -54,7 +54,7 @@ async def update_embed(sugestia):
   embed = msg.embeds[0]
   embed.clear_fields()
   for author, comment in sorted(sugestia['comments'].items(), key=lambda x: x[1]['time']):
-    embed.add_field(name=(await bot.fetch_user(author)).our_name + ':', value=comment['text'])
+    embed.add_field(name=(await bot.fetch_user(author)).our_name.replace('_', '\\_') + ':', value=comment['text'])
   await msg.edit(embed=embed)
 
 def view_for(sugestia):
@@ -538,11 +538,13 @@ async def setup(_bot):
       interaction.user,
     ))
 
-async def update_all():
+async def fix_all_since(id):
   logging.info('Updating all sugestie')
   for sugestia in database.data.get('sugestie', []):
-    await update(sugestia)
+    if sugestia['id'] >= id:
+      await update(sugestia)
+      await update_embed(sugestia)
 
 console.begin('sugestie')
-console.register('update_all', None, 'updates all sugestie', lambda: asyncio.run_coroutine_threadsafe(update_all(), bot.loop).result())
+console.register('fix_all_since', '<id>', 'fixes all sugestie starting from the given one', lambda x: asyncio.run_coroutine_threadsafe(fix_all_since(int(x)), bot.loop).result())
 console.end()
