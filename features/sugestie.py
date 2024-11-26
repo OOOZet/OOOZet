@@ -15,9 +15,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio, discord, discord.ext.tasks, logging
+from base64 import b64decode, b64encode
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import auto, Enum
+from io import BytesIO
+from mimetypes import guess_extension
 
 import console, database
 from common import config, debacktick, format_datetime, hybrid_check, limit_len, mention_datetime, mention_message, parse_duration, select_view, sleep_until
@@ -52,10 +55,18 @@ def emoji_status_of(sugestia):
 async def update_embed(sugestia):
   msg = await bot.get_channel(sugestia['channel']).fetch_message(sugestia['id'])
   embed = msg.embeds[0]
+
   embed.clear_fields()
   for author, comment in sorted(sugestia['comments'].items(), key=lambda x: x[1]['time']):
     embed.add_field(name=(await bot.fetch_user(author)).our_name.replace('_', '\\_') + ':', value=comment['text'], inline=False)
-  await msg.edit(embed=embed)
+
+  if sugestia['image'] is None:
+    embed.set_thumbnail(url=None)
+    await msg.edit(embed=embed, attachments=[])
+  else:
+    filename = 'sugestia' + guess_extension(sugestia['image']['format'])
+    embed.set_thumbnail(url=f'attachment://{filename}')
+    await msg.edit(embed=embed, attachments=[discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename)])
 
 def view_for(sugestia):
   view = discord.ui.View(timeout=None)
@@ -297,12 +308,12 @@ async def update(sugestia):
         await (await msg.channel.send(f'<@&{config["sugestie_vote_ping_role"]}>')).delete()
 
 async def time_updates(sugestia):
-  time = sugestia['review_end'] - timedelta(seconds=5) # 5 seconds to make sure the if passes.
+  time = sugestia['review_end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
   logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
   await sleep_until(time)
   await update(sugestia)
 
-  time = sugestia['vote_end'] - timedelta(seconds=5) # 5 seconds to make sure the if passes.
+  time = sugestia['vote_end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
   logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
   await sleep_until(time)
   await update(sugestia)
@@ -322,19 +333,36 @@ async def clean():
       if msg.author == bot.user:
         continue
 
+      image, image_format = None, None
+      if msg.attachments:
+        image_format = msg.attachments[0].content_type
+        if image_format is not None and image_format.startswith('image/'):
+          image = await msg.attachments[0].read()
+        else:
+          image_format = None
+
       await msg.delete()
       if msg.author.bot:
         continue
 
       embed = discord.Embed(title='Sugestia', description=msg.content)
       embed.set_footer(text=msg.author.our_name, icon_url=msg.author.display_avatar.url)
-      my_msg = await msg.channel.send(embed=embed)
+      if image is None:
+        my_msg = await msg.channel.send(embed=embed)
+      else:
+        filename = 'sugestia' + guess_extension(image_format)
+        embed.set_thumbnail(url=f'attachment://{filename}')
+        my_msg = await msg.channel.send(embed=embed, file=discord.File(BytesIO(image), filename))
 
       logging.info(f'{msg.author.id} created sugestia {my_msg.id}')
       sugestia = {
         'id': my_msg.id,
         'channel': my_msg.channel.id,
         'text': msg.content,
+        'image': {
+          'data': b64encode(image).decode(),
+          'format': image_format,
+        } if image is not None else None,
         'time': my_msg.created_at,
         'author': msg.author.id,
         'comments': {},
@@ -426,7 +454,12 @@ async def setup(_bot):
     async def callback(interaction2, choice):
       sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
       embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
-      await interaction2.response.send_message(embed=embed, ephemeral=True)
+      if sugestia['image'] is None:
+        await interaction2.response.send_message(embed=embed, ephemeral=True)
+      else:
+        filename = 'sugestia' + guess_extension(sugestia['image']['format'])
+        embed.set_image(url=f'attachment://{filename}')
+        await interaction2.response.send_message(embed=embed, file=discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename), ephemeral=True)
 
     await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
       [
@@ -448,7 +481,12 @@ async def setup(_bot):
     async def callback(interaction2, choice):
       sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
       embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
-      await interaction2.response.send_message(embed=embed, ephemeral=True)
+      if sugestia['image'] is None:
+        await interaction2.response.send_message(embed=embed, ephemeral=True)
+      else:
+        filename = 'sugestia' + guess_extension(sugestia['image']['format'])
+        embed.set_image(url=f'attachment://{filename}')
+        await interaction2.response.send_message(embed=embed, file=discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename), ephemeral=True)
 
     await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
       [
@@ -561,12 +599,20 @@ async def setup(_bot):
     ))
 
 async def fix_all(from_id):
-  logging.info('Updating all sugestie')
+  logging.info(f'Updating all sugestie starting from {from_id}')
   for sugestia in database.data.get('sugestie', []):
     if sugestia['id'] >= from_id:
       await update(sugestia)
       await update_embed(sugestia)
 
+async def delete_image(id):
+  logging.info(f'Deleting image from sugestia {id}')
+  sugestia = next(i for i in database.data['sugestie'] if i['id'] == id)
+  sugestia['image'] = None
+  database.should_save = True
+  await update_embed(sugestia)
+
 console.begin('sugestie')
 console.register('fix_all', '<id>', 'fixes all sugestie starting from the given one', lambda x: asyncio.run_coroutine_threadsafe(fix_all(int(x)), bot.loop).result())
+console.register('delete_image', '<id>', 'deletes the image from a sugestia', lambda x: asyncio.run_coroutine_threadsafe(delete_image(int(x)), bot.loop).result())
 console.end()
