@@ -18,7 +18,7 @@ import asyncio, discord, discord.ext.commands, logging, random, threading
 
 import console
 from common import config, options
-from features import about_me, counting, fajne_zadanka, misc, rules, sugestie, utils, warns, xp
+from features import about_me, counting, fajne_zadanka, help_forum, misc, rules, sugestie, utils, warns, xp
 from features.reminders import atcoder, codeforces, youtube
 
 class Client(discord.ext.commands.Bot):
@@ -28,6 +28,7 @@ class Client(discord.ext.commands.Bot):
     await codeforces.setup(self)
     await counting.setup(self)
     await fajne_zadanka.setup(self)
+    await help_forum.setup(self)
     await misc.setup(self)
     await rules.setup(self)
     await sugestie.setup(self)

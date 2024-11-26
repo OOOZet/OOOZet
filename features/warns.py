@@ -66,7 +66,7 @@ async def setup(_bot):
     database.data.setdefault('warns', {}).setdefault(user.id, []).append(warn)
     database.should_save = True
 
-    if member := bot.get_guild(config['guild']).get_member(user.id):
+    if (member := bot.get_guild(config['guild']).get_member(user.id)) is not None:
       await update_roles_for(member)
 
     count = len(database.data['warns'][user.id])
@@ -101,7 +101,7 @@ async def setup(_bot):
       database.data['warns'][user.id].remove(warn)
       database.should_save = True
 
-      if member := bot.get_guild(config['guild']).get_member(user.id):
+      if (member := bot.get_guild(config['guild']).get_member(user.id)) is not None:
         await update_roles_for(member)
 
       reason = debacktick(warn['reason'])

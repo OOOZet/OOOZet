@@ -120,7 +120,7 @@ async def setup(_bot):
       await interaction.response.send_message('Nikt jeszcze nie zebrał żadnego XP. 😴', ephemeral=True)
       return
 
-    result = f'Ranking 10 użytkowników z najwyższym XP: 🏆\n'
+    result = 'Ranking 10 użytkowników z najwyższym XP: 🏆\n'
     ranking = sorted(database.data['xp'].items(), key=lambda x: x[1], reverse=True)[:10]
     for i, entry in enumerate(ranking):
       user, xp = entry

@@ -110,12 +110,6 @@ async def setup(_bot):
     await interaction.response.send_message(f'W administracji serwera znajdują się: 👮\n{result}', ephemeral=True)
 
   @bot.listen()
-  async def on_message(msg):
-    if msg.id == msg.channel.id and msg.channel.parent_id == config['help_forum_channel'] and config['help_forum_ping_channel'] is not None:
-      mention = f'<@&{config["help_forum_ping_role"]}>' if config['help_forum_ping_role'] is not None else ''
-      await bot.get_channel(config['help_forum_ping_channel']).send(f'{mention} Ktoś potrzebuje pomocy na {msg.channel.mention}! 🆘')
-
-  @bot.listen()
   async def on_member_update(before, after):
     if before.is_timed_out() != after.is_timed_out() and config['timeout_role'] is not None:
       role = discord.Object(config['timeout_role'])
