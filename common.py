@@ -36,8 +36,11 @@ config = {
   'server_maintainer': None,                 # ID osoby odpowiedzialnej za logi bota
 
   'alarm_cooldown': '5m',                    # Cooldown dla komendy /alarm
+  'timeout_role': None,                      # Rola kosmetyczna pokazująca, czy użytkownik ma timeouta
+  'timeout_poll_rate': '1m',                 # Częstotliwość sprawdzania wygaśnięcia timeoutów
   'warn_roles': [],                          # Role kosmetyczne wskazujące na liczbę warnów użytkownika
   'counting_channel': None,                  # Kanał "#liczenie"
+  'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
 
   'xp_cooldown': '1m',                       # Odstęp czasu, po którym można ponownie dostać XP
   'xp_min_gain': 15,                         # Minimalna ilość XP, którą można dostać za jedną wiadomość
@@ -79,8 +82,6 @@ config = {
   'atcoder_role': None,                      # Rola, która jest pingowana w przypomnieniach o kontestach
   'atcoder_advance': '15m',                  # Wyprzedzenie, z którym są wysyłane przypomnienia o kontestach
   'atcoder_poll_rate': '1d',                 # Częstotliwość aktualizowania listy kontestów
-
-  'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
 
   'help_forum_channel': None,                # Forum, na którym użytkownicy pytają o pomoc z zadaniami
   'help_forum_ping_channel': None,           # Kanał, na który są wysyłane wezwania do pomocy na forum

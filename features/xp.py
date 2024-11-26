@@ -43,7 +43,7 @@ async def update_roles_for(member):
   assert member.guild.id == config['guild']
   level = xp_to_level(member.xp)
   for threshold, role in config['xp_roles']:
-    role = member.guild.get_role(role)
+    role = discord.Object(role)
     if level >= threshold:
       await member.add_roles(role)
     else:

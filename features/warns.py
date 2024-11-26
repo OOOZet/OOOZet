@@ -35,7 +35,7 @@ def check_warns_for(user):
 async def update_roles_for(member):
   logging.info(f'Updating warn roles for {member.id}')
   assert member.guild.id == config['guild']
-  roles = [member.guild.get_role(i) for i in config['warn_roles']]
+  roles = [discord.Object(i) for i in config['warn_roles']]
   await member.remove_roles(*roles)
   count = len(database.data.get('warns', {}).get(member.id, []))
   if count > 0 and roles:
