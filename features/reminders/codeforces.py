@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import database
-from common import config, mention_datetime, parse_duration
+from common import config, debacktick, mention_datetime, parse_duration
 
 async def setup(bot):
   @dataclass
@@ -194,24 +194,43 @@ async def setup(bot):
 
     a = random.choice(['Agent', 'Legenda', 'Mistrz', 'Pogromca', 'Przyjaciel', 'Zaklinacz', 'Zbawiciel', 'Zjadacz'])
     b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
-    name = f'{a} {b}'
 
-    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{name}` w przeciągu **{3 * 60} sekund** i czekaj. 🥺', ephemeral=True)
+    # U+202F is not a word break and allows both words to be selected at once.
+    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}` w przeciągu **{3 * 60} sekund** i czekaj. 🥺', ephemeral=True)
     await asyncio.sleep(3 * 60)
 
     async with aiohttp.ClientSession() as session:
       json = await (await session.get(f'https://codeforces.com/api/user.info?handles={handle}&checkHistoricHandles=false')).json()
     if json['status'] != 'OK':
       raise Exception(f'Codeforces user info verification request failed: {json["comment"]!r}')
+    first = json['result'][0].get('firstName')
+    last = json['result'][0].get('lastName')
 
-    if json['result'][0].get('firstName') == name:
+    x = ''.join((first or '').split())
+    y = ''.join((last or '').split())
+    if x == a + b:
+      success = ''
+    elif y == a + b:
+      success = '-# Psst… Miałeś ustawić swoje *imię*, a nie nazwisko. 😉'
+    elif x + y == a + b:
+      success = '-# Psst… Gratuluję bycia na tyle mądrym, żeby rodzielić hasło weryfikacyjne na imię i nazwisko, mimo iż polecenie kazało ustawić samo imię. 😌'
+    else:
+      success = None
+
+    if success is not None:
       logging.info(f'{interaction.user.id} has successfully set their Codeforces handle to {handle!r}')
       database.data.setdefault('codeforces_handles', {})[interaction.user.id] = handle
       database.should_save = True
-      await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na Codeforces na `{handle}`! 🥳')
+      await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na Codeforces na `{handle}`! 🥳\n{success}')
     else:
-      logging.info(f'{interaction.user.id} failed to verify their Codeforces handle ({json["result"][0].get("firstName")!r} != {name!r})')
-      await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. 😕')
+      logging.info(f'{interaction.user.id} failed to verify their Codeforces handle ({first!r} & {last!r} != {a!r} & {b!r})')
+      if first is None:
+        read = 'end of file'
+      elif '`' in first:
+        read = 'stringa z grawisami (*ty hakierze*)'
+      else:
+        read = f'`{first}`'
+      await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. Oczekiwano `{a} {b}`, wczytano {read}. 😕')
 
   async def get(interaction, user):
     handle = database.data.get('codeforces_handles', {}).get(user.id)
