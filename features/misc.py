@@ -41,7 +41,7 @@ async def setup(_bot):
   @bot.on_check_failure
   async def on_check_failure(interaction, error):
     if isinstance(error, NoStaffError):
-      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🤨', ephemeral=True)
+      await interaction.response.send_message('Hmm, z jakiegoś powodu nie jest mi znane, żeby ktoś był w administracji… 🧐', ephemeral=True)
     else:
       raise
 
@@ -97,7 +97,7 @@ async def setup(_bot):
     staff = get_staff()
     emoji = random.choice(['😟', '😖', '😱', '😮', '😵', '😵‍💫', '🥴'])
     mentions = ' '.join(i.mention for i in staff)
-    await interaction.response.send_message(f'{mentions} Potrzebna natychmiastowa interwencja!!! {emoji}')
+    await interaction.response.send_message(f'{mentions} Potrzebna natychmiastowa interwencja!!! {emoji}', allowed_mentions=discord.AllowedMentions.all())
     for user in staff:
       msg = (await interaction.original_response()).jump_url
       await user.send(f'{interaction.user.mention} potrzebuje natychmiastowej interwencji na {msg}!!! {emoji}')

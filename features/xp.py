@@ -91,7 +91,7 @@ async def setup(_bot):
           f'{member.mention} zdobył kolejny poziom **{level}**. Brawo! {emoji}',
           f'{member.mention} zdobył kolejny poziom **{level}**. Moje kondolencje. {emoji}',
         ])
-        await bot.get_channel(config['xp_channel']).send(announcement)
+        await bot.get_channel(config['xp_channel']).send(announcement, allowed_mentions=discord.AllowedMentions.all())
 
   xp = discord.app_commands.Group(name='xp', description='Komendy do XP')
   bot.tree.add_command(xp)

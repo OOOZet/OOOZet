@@ -49,7 +49,7 @@ async def setup(bot):
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
+    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', allowed_mentions=discord.AllowedMentions.all(), suppress_embeds=True)
 
   async def send_national_standings(contest):
     logging.info(f'Sending national standings for Codeforces contest {contest.id}')
@@ -196,21 +196,21 @@ async def setup(bot):
     b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
     name = f'{a} {b}'
 
-    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{name}` w przeciągu **60 sekund** i czekaj. 🥺', ephemeral=True)
-    await asyncio.sleep(60)
+    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{name}` w przeciągu **{3 * 60} sekund** i czekaj. 🥺', ephemeral=True)
+    await asyncio.sleep(3 * 60)
 
     async with aiohttp.ClientSession() as session:
       json = await (await session.get(f'https://codeforces.com/api/user.info?handles={handle}&checkHistoricHandles=false')).json()
     if json['status'] != 'OK':
       raise Exception(f'Codeforces user info verification request failed: {json["comment"]!r}')
 
-    if json['result'][0]['firstName'] == name:
+    if json['result'][0].get('firstName') == name:
       logging.info(f'{interaction.user.id} has successfully set their Codeforces handle to {handle!r}')
       database.data.setdefault('codeforces_handles', {})[interaction.user.id] = handle
       database.should_save = True
       await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na Codeforces na `{handle}`! 🥳')
     else:
-      logging.info(f'{interaction.user.id} failed to verify their Codeforces handle ({json["result"][0]["firstName"]!r} != {name!r})')
+      logging.info(f'{interaction.user.id} failed to verify their Codeforces handle ({json["result"][0].get("firstName")!r} != {name!r})')
       await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. 😕')
 
   async def get(interaction, user):

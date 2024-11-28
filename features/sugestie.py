@@ -302,10 +302,10 @@ async def update(sugestia):
   if is_ongoing(sugestia):
     if buttonc_before < 3 and datetime.now().astimezone() < sugestia['review_end']:
       if config['sugestie_review_ping_role'] is not None:
-        await (await msg.channel.send(f'<@&{config["sugestie_review_ping_role"]}>')).delete()
+        await (await msg.channel.send(f'<@&{config["sugestie_review_ping_role"]}>', allowed_mentions=discord.AllowedMentions.all())).delete()
     elif buttonc_before < 4 and datetime.now().astimezone() < sugestia['vote_end']:
       if config['sugestie_vote_ping_role'] is not None:
-        await (await msg.channel.send(f'<@&{config["sugestie_vote_ping_role"]}>')).delete()
+        await (await msg.channel.send(f'<@&{config["sugestie_vote_ping_role"]}>', allowed_mentions=discord.AllowedMentions.all())).delete()
 
 async def time_updates(sugestia):
   time = sugestia['review_end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
@@ -575,6 +575,7 @@ async def setup(_bot):
 
       logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
       database.data['sugestie'].remove(sugestia)
+      database.should_save = True
 
       try:
         await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).delete()

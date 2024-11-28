@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, logging
+import aiohttp, asyncio, discord, logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
@@ -52,7 +52,7 @@ async def setup(bot):
     else:
       announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.title}]({video.link})! 🔔'
     await bot.wait_until_ready()
-    await bot.get_channel(config['oki_channel']).send(announcement)
+    await bot.get_channel(config['oki_channel']).send(announcement, allowed_mentions=discord.AllowedMentions.all())
 
   reminders = {}
 

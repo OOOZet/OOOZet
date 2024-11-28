@@ -30,7 +30,7 @@ async def setup(_bot):
   async def on_message(msg):
     if msg.id == msg.channel.id and msg.channel.parent_id == config['help_forum_channel'] and config['help_forum_ping_channel'] is not None:
       mention = f'<@&{config["help_forum_ping_role"]}>' if config['help_forum_ping_role'] is not None else ''
-      await bot.get_channel(config['help_forum_ping_channel']).send(f'{mention} Ktoś potrzebuje pomocy na {msg.channel.mention}! 🆘')
+      await bot.get_channel(config['help_forum_ping_channel']).send(f'{mention} Ktoś potrzebuje pomocy na {msg.channel.mention}! 🆘', allowed_mentions=discord.AllowedMentions.all())
 
   def get_ranking():
     return sorted(database.data.get('help_forum_karma', {}).items(), key=lambda x: x[1], reverse=True)
@@ -38,7 +38,12 @@ async def setup(_bot):
   @bot.tree.command(description='Wyświetla 10 najbardziej pomocnych użytkowników w ostatnim czasie')
   async def helpful(interaction):
     ranking = get_ranking()
-    assert ranking
+    if not ranking:
+      if config['help_forum_channel'] is None:
+        await interaction.response.send_message('Na tym serwerze nie zostało jeszcze stworzone forum pomocy. 😔', ephemeral=True)
+      else:
+        await interaction.response.send_message(f'Nikt jeszcze nie pomógł nikomu na <#{config["help_forum_channel"]}>. 😔', ephemeral=True)
+      return
 
     result = 'Ranking 10 najbardziej pomocnych użytkowników w ostatnim czasie: ❤️\n'
     for i, entry in enumerate(ranking[:10]):

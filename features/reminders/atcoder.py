@@ -50,7 +50,7 @@ async def setup(bot):
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['atcoder_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', suppress_embeds=True)
+    await bot.get_channel(config['atcoder_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', allowed_mentions=discord.AllowedMentions.all(), suppress_embeds=True)
 
   reminders = []
 

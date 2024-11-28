@@ -70,7 +70,7 @@ async def setup(_bot):
       await update_roles_for(member)
 
     count = len(database.data['warns'][user.id])
-    await interaction.response.send_message(f'{user.mention} właśnie dostał swojego **{count}-ego** warna za `{debacktick(reason)}`! 😒')
+    await interaction.response.send_message(f'{user.mention} właśnie dostał swojego **{count}-ego** warna za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
 
   @bot.tree.command(name='warn', description='Warnuje użytkownika')
   @discord.app_commands.guilds(config['guild'])

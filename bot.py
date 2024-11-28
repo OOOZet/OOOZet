@@ -45,7 +45,7 @@ class Client(discord.ext.commands.Bot):
     intents = discord.Intents.default()
     intents.message_content = True
     intents.members = True
-    super().__init__('This parameter is irrelevant for us but we still have to put something here.', intents=intents)
+    super().__init__('This parameter is irrelevant for us but we still have to put something here.', intents=intents, allowed_mentions=discord.AllowedMentions.none())
 
     self.check_failure_handlers = []
 
@@ -80,7 +80,7 @@ class Client(discord.ext.commands.Bot):
     if config['server_maintainer'] is None:
       await send(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}', ephemeral=True)
     else:
-      await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True)
+      await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
 
   async def on_ready(self):
     logging.info(f'Logged in as {str(self.user)!r}')
