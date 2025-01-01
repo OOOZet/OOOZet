@@ -62,6 +62,8 @@ async def setup(_bot):
     logging.info(f'User {member.id} joined the guild')
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
+    if member.is_timed_out() and config['timeout_role'] is not None:
+      await member.add_roles(discord.Object(config['timeout_role']))
 
   @bot.listen()
   async def on_member_remove(member):
