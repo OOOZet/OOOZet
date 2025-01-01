@@ -176,9 +176,10 @@ async def setup(_bot):
     if msg.author != bot.user or not msg.embeds:
       return
 
-    if payload.emoji.name == '❌' and msg.embeds[0].footer.text == bot.get_user(payload.user_id).our_name: # Watch out for identity theft!
+    is_author = msg.embeds[0].footer.text == bot.get_user(payload.user_id).our_name
+    if payload.emoji.name == '❌' and is_author: # Watch out for identity theft!
       await msg.delete()
-    elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me):
+    elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me) or is_author:
       await msg.remove_reaction(payload.emoji, discord.Object(payload.user_id))
 
 console.begin('fajne_zadanka')
