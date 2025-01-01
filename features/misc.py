@@ -87,7 +87,7 @@ async def setup(_bot):
     if 'alarm_last' in database.data:
       cooldown = parse_duration(config['alarm_cooldown'])
       if (now - database.data['alarm_last']).total_seconds() < cooldown:
-        await interaction.response.send_message(f'Alarm już zabrzmiał w przeciągu ostatnich **{cooldown}** sekund. ⏱️', ephemeral=True)
+        await interaction.response.send_message(f'Alarm już zabrzmiał w ciągu ostatnich **{cooldown}** sekund. ⏱️', ephemeral=True)
         return
 
     logging.info(f'{interaction.user.id} has raised the alarm!')

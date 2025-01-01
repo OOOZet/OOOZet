@@ -21,8 +21,10 @@ from datetime import datetime, timedelta
 from io import StringIO
 from urllib.parse import unquote, urlparse
 
-import database
+import console, database
 from common import config, parse_duration
+
+bot = None
 
 async def fetch_html(url):
   async with aiohttp.ClientSession() as session:
@@ -81,7 +83,23 @@ async def find_problem(url):
         next(html.find(class_='problem-title').h1.strings).strip(),
       )
 
-async def setup(bot):
+  elif url.hostname == 'qoj.ac':
+    if match := re.match('(?:/contest/[0-9]+)?/problem/([0-9]+)', path):
+      url = f'https://qoj.ac/problem/{match[1]}'
+      return url, (await fetch_html(url)).find(class_='page-header').text.partition('.')[2].strip()
+
+async def fix(id):
+  msg = await bot.get_channel(config['fajne_zadanka_channel']).fetch_message(id)
+  embed = msg.embeds[0]
+  metadata = await find_problem(embed.url)
+  if metadata:
+    embed.url, embed.title = metadata
+    await msg.edit(embed=embed)
+
+async def setup(_bot):
+  global bot
+  bot = _bot
+
   lock = asyncio.Lock()
 
   async def clean():
@@ -162,3 +180,7 @@ async def setup(bot):
       await msg.delete()
     elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me):
       await msg.remove_reaction(payload.emoji, discord.Object(payload.user_id))
+
+console.begin('fajne_zadanka')
+console.register('fix', '<id>', 'fixes embed', lambda x: asyncio.run_coroutine_threadsafe(fix(int(x)), bot.loop).result())
+console.end()

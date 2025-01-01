@@ -196,7 +196,7 @@ async def setup(bot):
     b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
 
     # U+202F is not a word break and allows both words to be selected at once.
-    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}` w przeciągu **{3 * 60} sekund** i czekaj. 🥺', ephemeral=True)
+    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True)
     await asyncio.sleep(3 * 60)
 
     async with aiohttp.ClientSession() as session:
