@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -106,23 +106,20 @@ async def setup(bot):
 
     while lines:
       if len(lines[0][0]) > 2000:
-        yield lines[0][0]
-        del lines[0][0]
+        yield lines[0].pop(0)
         if not lines[0]:
           del lines[0]
 
       elif sum(map(len, lines[0])) > 2000:
         fragment = ''
         while len(fragment) + len(lines[0][0]) <= 2000:
-          fragment += lines[0][0]
-          del lines[0][0]
+          fragment += lines[0].pop(0)
         yield fragment
 
       else:
         fragment = ''
         while lines and len(fragment) + sum(map(len, lines[0])) <= 2000:
-          fragment += ''.join(lines[0])
-          del lines[0]
+          fragment += ''.join(lines.pop(0))
         yield fragment
 
   async def resend(interaction):

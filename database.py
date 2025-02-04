@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ from datetime import datetime
 import console
 from common import config, parse_duration
 
-data = {}
+data = None
 should_save = False
 lock = threading.RLock()
 
@@ -41,17 +41,17 @@ def load():
               return x
           return {maybe_int(k): v for k, v in object.items()}
       with open(config['database'], 'r') as file:
-        loaded = json.load(file, object_hook=object_hook)
-
-      global data, should_save
-      data |= loaded
-      should_save = False
+        global data
+        data = json.load(file, object_hook=object_hook)
     except FileNotFoundError:
-      pass
+      data = {}
+    global should_save
+    should_save = False
 
 def save():
   logging.info('Saving database')
   with lock:
+    assert data is not None
     global should_save
     should_save = False
 

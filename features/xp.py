@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,7 @@ def set_xp(self, value):
   database.data.setdefault('xp', {})[self.id] = value
   database.should_save = True
 
-discord.User.xp = discord.Member.xp = property(fget=get_xp, fset=set_xp)
+discord.User.xp = discord.Member.xp = property(get_xp, set_xp)
 
 def xp_to_level(xp):
   return floor(sqrt(xp / 50 + 0.25) - 0.5)

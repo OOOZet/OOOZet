@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by

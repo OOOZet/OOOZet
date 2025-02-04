@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2024 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -206,7 +206,7 @@ def hybrid_check(pred):
       return discord.app_commands.check(our_pred)(arg)
   return decorator_or_pred
 
-discord.User.our_name = discord.Member.our_name = property(fget=lambda self: self.name + ('#' + self.discriminator if self.discriminator != '0' else ''))
+discord.User.our_name = discord.Member.our_name = property(lambda self: self.name + ('#' + self.discriminator if self.discriminator != '0' else ''))
 
 def limit_len(string): # Used primarily for labels in select views
   return string if len(string) <= 100 else string[:99] + '…'
