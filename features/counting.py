@@ -35,7 +35,7 @@ async def setup(bot):
     async with lock:
       async for msg in bot.get_channel(config['counting_channel']).history(limit=None, after=database.data['counting_clean_until']):
         try:
-          num = int(msg.content)
+          num = int(msg.content, 0)
         except ValueError:
           await msg.delete()
         else:
