@@ -132,3 +132,8 @@ async def setup(_bot):
           await member.remove_roles(discord.Object(config['timeout_role']))
 
   poll_timeouts.start()
+
+  @bot.listen()
+  async def on_message(msg):
+    if msg.channel.id in config['media_channels'] and all(i.width is None and i.height is None for i in msg.attachments):
+      await msg.delete()

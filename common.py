@@ -38,6 +38,8 @@ config = {
   'alarm_cooldown': '5m',                    # Cooldown dla komendy /alarm
   'timeout_role': None,                      # Rola kosmetyczna pokazująca, czy użytkownik ma timeouta
   'timeout_poll_rate': '1m',                 # Częstotliwość sprawdzania wygaśnięcia timeoutów
+  'media_channels': [],                      # Kanały, na które można wysyłać tylko zdjęcia i filmy
+
   'warn_roles': [],                          # Role kosmetyczne wskazujące na liczbę warnów użytkownika
   'counting_channel': None,                  # Kanał "#liczenie"
   'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
