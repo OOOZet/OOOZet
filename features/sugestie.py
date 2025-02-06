@@ -57,8 +57,8 @@ async def update_embed(sugestia):
   embed = msg.embeds[0]
 
   embed.clear_fields()
-  for author, comment in sorted(sugestia['comments'].items(), key=lambda x: x[1]['time']):
-    embed.add_field(name=(await bot.fetch_user(author)).our_name.replace('_', '\\_') + ':', value=comment['text'], inline=False)
+  for author, opinion in sorted(sugestia['opinions'].items(), key=lambda x: x[1]['time'], reverse=True):
+    embed.add_field(name=(await bot.fetch_user(author)).our_name.replace('_', '\\_') + ':', value=opinion['text'], inline=False)
 
   if sugestia['image'] is None:
     embed.set_thumbnail(url=None)
@@ -72,22 +72,22 @@ def view_for(sugestia):
   view = discord.ui.View(timeout=None)
 
   if sugestia.get('annulled', {}).get('time', datetime.now().astimezone()) < sugestia['review_end']:
-    async def on_comment(interaction):
+    async def on_opinion(interaction):
       if config['sugestie_role'] is not None and interaction.user.get_role(config['sugestie_role']) is None:
-        await interaction.response.send_message(f'Nie masz jeszcze roli <@&{config["sugestie_role"]}> i nie możesz komentować sugestii. 😢', ephemeral=True)
+        await interaction.response.send_message(f'Nie masz jeszcze roli <@&{config["sugestie_role"]}> i nie możesz opiniować sugestii. 😢', ephemeral=True)
         return
       if interaction.created_at >= sugestia['review_end']:
-        await interaction.response.send_message('Czas na komentowanie tej sugestii już się skończył. ⏱️', ephemeral=True)
+        await interaction.response.send_message('Czas na opiniowanie tej sugestii już się skończył. ⏱️', ephemeral=True)
         return
 
       async def on_submit(interaction2):
         if config['sugestie_role'] is not None and interaction2.user.get_role(config['sugestie_role']) is None:
-          await interaction2.response.send_message(f'Nie masz jeszcze roli <@&{config["sugestie_role"]}> i nie możesz komentować sugestii. 😢', ephemeral=True)
+          await interaction2.response.send_message(f'Nie masz jeszcze roli <@&{config["sugestie_role"]}> i nie możesz opiniować sugestii. 😢', ephemeral=True)
         elif interaction2.created_at >= sugestia['review_end']:
-          await interaction2.response.send_message('Czas na komentowanie tej sugestii już się skończył. ⏱️', ephemeral=True)
+          await interaction2.response.send_message('Czas na opiniowanie tej sugestii już się skończył. ⏱️', ephemeral=True)
         else:
-          logging.info(f'{interaction2.user.id} has commented on sugestia {sugestia["id"]}')
-          sugestia['comments'][interaction2.user.id] = {
+          logging.info(f'{interaction2.user.id} has given their opinion of sugestia {sugestia["id"]}')
+          sugestia['opinions'][interaction2.user.id] = {
             'text': text_input.value,
             'time': interaction2.created_at,
           }
@@ -96,66 +96,66 @@ def view_for(sugestia):
           await update_embed(sugestia)
 
           msg = mention_message(bot, sugestia['channel'], sugestia['id'])
-          await interaction2.response.send_message(f'Pomyślnie dodano komentarz do sugestii {msg}! 🥳', ephemeral=True)
+          await interaction2.response.send_message(f'Pomyślnie zaopiniowano sugestię {msg}! 🥳', ephemeral=True)
 
       text_input = discord.ui.TextInput(
-        default=sugestia['comments'].get(interaction.user.id, {}).get('text'),
-        label='Komentarz',
+        default=sugestia['opinions'].get(interaction.user.id, {}).get('text'),
+        label='Opinia',
         max_length=1024,
         style=discord.TextStyle.long,
       )
-      modal = discord.ui.Modal(title='Skomentuj sugestię')
+      modal = discord.ui.Modal(title='Zaopiniuj sugestię')
       modal.on_submit = on_submit
       modal.add_item(text_input)
       await interaction.response.send_modal(modal)
 
-    comment = discord.ui.Button(custom_id='comment', label='Skomentuj', style=discord.ButtonStyle.green)
-    comment.callback = on_comment
-    view.add_item(comment)
+    opinion = discord.ui.Button(custom_id='opinion', label='Zaopiniuj', style=discord.ButtonStyle.green)
+    opinion.callback = on_opinion
+    view.add_item(opinion)
 
     async def on_delete(interaction):
       msg = mention_message(bot, sugestia['channel'], sugestia['id'])
 
       if is_staff(interaction.user):
-        if not sugestia['comments']:
-          await interaction.response.send_message(f'Nie zostały jeszcze dodane żadne komentarze do tej sugestii… 🤨', ephemeral=True)
+        if not sugestia['opinions']:
+          await interaction.response.send_message(f'Nikt jeszcze nie zaopiniował tej sugestii… 🤨', ephemeral=True)
           return
 
         async def callback(interaction2, choice):
-          check_staff('usuwania komentarzy')(interaction2)
+          check_staff('usuwania opinii')(interaction2)
           author = int(choice)
 
-          logging.info(f"{interaction.user.id} has removed {author}'s comment from sugestia {sugestia['id']}")
-          del sugestia['comments'][author]
+          logging.info(f"{interaction.user.id} has removed {author}'s opinion of sugestia {sugestia['id']}")
+          del sugestia['opinions'][author]
           database.should_save = True
 
           await update_embed(sugestia)
 
-          await interaction2.response.send_message(f'Pomyślnie usunięto komentarz <@{author}> do sugestii {msg}. 🙄', ephemeral=True)
+          await interaction2.response.send_message(f'Pomyślnie usunięto opinię <@{author}> o sugestii {msg}. 🙄', ephemeral=True)
 
-        await interaction.response.send_message('Który komentarz chcesz usunąć?', view=select_view(
+        await interaction.response.send_message('Którą opinię chcesz usunąć?', view=select_view(
           [
-            discord.SelectOption(label=limit_len(comment['text']), value=author, description=(await bot.fetch_user(author)).our_name)
-            for author, comment in sugestia['comments'].items()
+            discord.SelectOption(label=limit_len(opinion['text']), value=author, description=(await bot.fetch_user(author)).our_name)
+            for author, opinion in sugestia['opinions'].items()
           ],
           callback,
           interaction.user,
         ), ephemeral=True)
 
       else:
-        if interaction.user.id not in sugestia['comments']:
-          await interaction.response.send_message(f'Nie dodałeś żadnego komentarza do tej sugestii… 🤨', ephemeral=True)
+        if interaction.user.id not in sugestia['opinions']:
+          await interaction.response.send_message(f'Nie zaopiniowałeś jeszcze tej sugestii… 🤨', ephemeral=True)
           return
 
-        logging.info(f'{interaction.user.id} has removed their comment from sugestia {sugestia["id"]}')
-        del sugestia['comments'][interaction.user.id]
+        logging.info(f'{interaction.user.id} has removed their opinion of sugestia {sugestia["id"]}')
+        del sugestia['opinions'][interaction.user.id]
         database.should_save = True
 
         await update_embed(sugestia)
 
-        await interaction.response.send_message(f'Pomyślnie usunięto twój komentarz do sugestii {msg}. 🫡', ephemeral=True)
+        await interaction.response.send_message(f'Pomyślnie usunięto twoją opinię o sugestii {msg}. 🫡', ephemeral=True)
 
-    delete = discord.ui.Button(custom_id='delete', label='Usuń komentarz', style=discord.ButtonStyle.red)
+    delete = discord.ui.Button(custom_id='delete', label='Usuń opinię', style=discord.ButtonStyle.red)
     delete.callback = on_delete
     view.add_item(delete)
 
@@ -220,9 +220,9 @@ def view_for(sugestia):
     if sugestia.get('annulled', {}).get('time', datetime.now().astimezone()) < sugestia['review_end']:
       review_end = mention_datetime(sugestia['review_end'])
       if 'annulled' in sugestia:
-        result = f'Komentowanie miało skończyć się {review_end}. \n'
+        result = f'Opiniowanie miało skończyć się {review_end}. \n'
       else:
-        result = f'**Komentowanie jeszcze trwa** i skończy się {review_end}. ❔\n'
+        result = f'**Opiniowanie jeszcze trwa** i skończy się {review_end}. ❔\n'
 
     else:
       vote_end = mention_datetime(sugestia['vote_end'])
@@ -365,7 +365,7 @@ async def clean():
         } if image is not None else None,
         'time': my_msg.created_at,
         'author': msg.author.id,
-        'comments': {},
+        'opinions': {},
         'review_end': my_msg.created_at + timedelta(seconds=parse_duration(config['sugestie_review_length'])),
         'for': set(),
         'abstain': set(),

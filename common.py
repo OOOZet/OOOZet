@@ -52,9 +52,9 @@ config = {
   'xp_channel': None,                        # Kanał na ogłoszenia o kolejnych poziomach zdobywanych przez użytkowników
 
   'sugestie_channel': None,                  # Kanał "#sugestie"
-  'sugestie_role': None,                     # Rola, która może komentować i głosować nad sugestiami
+  'sugestie_role': None,                     # Rola, która może opiniować i głosować nad sugestiami
   'sugestie_review_ping_role': None,         # Rola, która jest pingowana, gdy pojawia się nowa sugestia
-  'sugestie_review_length': '1d',            # Czas na komentowanie sugestii
+  'sugestie_review_length': '1d',            # Czas na opiniowanie sugestii
   'sugestie_vote_ping_role': None,           # Rola, która jest pingowana, gdy zaczyna się głosowanie nad sugestią
   'sugestie_vote_length': '1d',              # Czas na głosowanie nad sugestią
 
