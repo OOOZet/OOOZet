@@ -181,6 +181,13 @@ async def setup(_bot):
       await msg.delete()
     elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me) or is_author:
       await msg.remove_reaction(payload.emoji, discord.Object(payload.user_id))
+    else:
+      for reaction in msg.reactions:
+        if reaction.emoji != payload.emoji.name:
+          try:
+            await reaction.remove(discord.Object(payload.user_id))
+          except discord.NotFound:
+            pass
 
 console.begin('fajne_zadanka')
 console.register('fix', '<id>', 'fixes embed', lambda x: asyncio.run_coroutine_threadsafe(fix(int(x)), bot.loop).result())
