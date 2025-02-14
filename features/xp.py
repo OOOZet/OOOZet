@@ -17,11 +17,13 @@
 import asyncio, discord, logging, random
 from datetime import datetime
 from math import floor, sqrt
+from threading import Lock
 
 import console, database
 from common import config, parse_duration
 
 bot = None
+lock = Lock()
 
 def get_xp(self):
   return database.data.get('xp', {}).get(self.id, 0)
@@ -58,15 +60,13 @@ async def setup(_bot):
   global bot
   bot = _bot
 
-  lock = asyncio.Lock()
-
   @bot.listen()
   async def on_message(msg):
     member = msg.author
     if member.bot or msg.guild is None or msg.guild.id != config['guild'] or (msg.channel.id not in config['xp_unignored_channels'] and (msg.channel.id in config['xp_ignored_channels'] or msg.channel.category_id in config['xp_ignored_categories'])):
       return
 
-    async with lock:
+    with lock:
       now = datetime.now().astimezone()
       if member.id in database.data.setdefault('xp_last_gain', {}):
         cooldown = parse_duration(config['xp_cooldown'])
@@ -76,9 +76,10 @@ async def setup(_bot):
 
     gain = random.randint(config['xp_min_gain'], config['xp_max_gain'])
     logging.info(f'{member.id} gained {gain} XP')
-    old_level = xp_to_level(member.xp)
-    member.xp += gain
-    level = xp_to_level(member.xp)
+    with lock:
+      old_level = xp_to_level(member.xp)
+      member.xp += gain
+      level = xp_to_level(member.xp)
 
     if level != old_level:
       await update_roles_for(member)
@@ -138,6 +139,19 @@ async def setup(_bot):
       result += f'- <@&{role}> za poziom **{level}**\n'
     await interaction.response.send_message(result, ephemeral=True)
 
+def transfer(from_, to):
+  with lock:
+    database.data['xp'][to] += database.data['xp'][from_]
+    database.data['xp'][from_] = 0
+    database.should_save = True
+
+def init(user):
+  with lock:
+    database.data.setdefault('xp', {}).setdefault(user, 0)
+    database.should_save = True
+
 console.begin('xp')
 console.register('update_roles', None, 'updates XP roles for all members', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())
+console.register('transfer', '<from> <to>', 'transfers XP from one account to another', lambda x: transfer(*map(int, x.split())))
+console.register('init', '<id>', 'makes sure the XP database entry for a user exists', lambda x: init(int(x)))
 console.end()
