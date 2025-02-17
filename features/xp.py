@@ -139,11 +139,16 @@ async def setup(_bot):
       result += f'- <@&{role}> za poziom **{level}**\n'
     await interaction.response.send_message(result, ephemeral=True)
 
-def transfer(from_, to):
+async def transfer(from_, to):
   with lock:
     database.data['xp'][to] += database.data['xp'][from_]
     database.data['xp'][from_] = 0
     database.should_save = True
+
+  if (member := bot.get_guild(config['guild']).get_member(from_)) is not None:
+    await update_roles_for(member)
+  if (member := bot.get_guild(config['guild']).get_member(to)) is not None:
+    await update_roles_for(member)
 
 def init(user):
   with lock:
@@ -152,6 +157,6 @@ def init(user):
 
 console.begin('xp')
 console.register('update_roles', None, 'updates XP roles for all members', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())
-console.register('transfer', '<from> <to>', 'transfers XP from one account to another', lambda x: transfer(*map(int, x.split())))
+console.register('transfer', '<from> <to>', 'transfers XP from one account to another', lambda x: asyncio.run_coroutine_threadsafe(transfer(*map(int, x.split())), bot.loop).result())
 console.register('init', '<id>', 'makes sure the XP database entry for a user exists', lambda x: init(int(x)))
 console.end()

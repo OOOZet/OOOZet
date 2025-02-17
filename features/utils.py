@@ -29,7 +29,7 @@ class NotStaffError(discord.app_commands.CheckFailure):
 def check_staff(action=None): # "… uprawnień do {action}, …"
   @hybrid_check
   def pred(interaction):
-    if interaction.guild.id != config['guild']:
+    if interaction.guild is None or interaction.guild.id != config['guild']:
       return False # Asserts don't get caught in app command checks.
     if not is_staff(interaction.user):
       raise NotStaffError(action)
