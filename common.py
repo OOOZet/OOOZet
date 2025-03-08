@@ -15,7 +15,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio, discord, json, logging
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Callable
 
 options = {
   'config': 'config.json',
@@ -196,17 +198,24 @@ def select_view(select_options, callback, owner):
 
   return view
 
-def hybrid_check(pred):
-  def our_pred(interaction):
-    if pred(interaction) is False:
-      return False
-    return True
-  def decorator_or_pred(arg=None):
-    if arg is None or isinstance(arg, discord.Interaction):
-      return our_pred(arg)
-    else:
-      return discord.app_commands.check(our_pred)(arg)
-  return decorator_or_pred
+@dataclass
+class HybridCheck:
+  pred: Callable[[discord.Interaction], bool]
+  is_consistent: bool # Makes the check be taken into account in /help
+
+  def __call__(self, *args, **kwargs):
+    return self.pred(*args, **kwargs) is not False
+
+def hybrid_check(*, is_consistent=False):
+  def decorator(pred):
+    check = HybridCheck(pred, is_consistent)
+    def decorator_or_pred(arg=None):
+      if arg is None or isinstance(arg, discord.Interaction):
+        return check(arg)
+      else:
+        return discord.app_commands.check(check)(arg)
+    return decorator_or_pred
+  return decorator
 
 discord.User.our_name = discord.Member.our_name = property(lambda self: self.name + ('#' + self.discriminator if self.discriminator != '0' else ''))
 

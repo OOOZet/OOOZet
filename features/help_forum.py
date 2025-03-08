@@ -18,13 +18,28 @@ import asyncio, discord, logging
 from datetime import datetime, timedelta
 
 import console, database
-from common import config, parse_duration
+from common import config, hybrid_check, parse_duration
 
 bot = None
+
+class NoHelpForumChannelError(discord.app_commands.CheckFailure):
+  pass
+
+@hybrid_check(is_consistent=True)
+def check_help_forum_channel(interaction):
+  if config['help_forum_channel'] is None:
+    raise NoHelpForumChannelError()
 
 async def setup(_bot):
   global bot
   bot = _bot
+
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
+    if isinstance(error, NoHelpForumError):
+      await interaction.response.send_message('Na tym serwerze nie zostało jeszcze stworzone forum pomocy. 😔', ephemeral=True)
+    else:
+      raise
 
   @bot.listen()
   async def on_message(msg):
@@ -36,13 +51,11 @@ async def setup(_bot):
     return sorted(database.data.get('help_forum_karma', {}).items(), key=lambda x: x[1], reverse=True)
 
   @bot.tree.command(description='Wyświetla 10 najbardziej pomocnych użytkowników w ostatnim czasie')
+  @check_help_forum_channel
   async def helpful(interaction):
     ranking = get_ranking()
     if not ranking:
-      if config['help_forum_channel'] is None:
-        await interaction.response.send_message('Na tym serwerze nie zostało jeszcze stworzone forum pomocy. 😔', ephemeral=True)
-      else:
-        await interaction.response.send_message(f'Nikt jeszcze nie pomógł nikomu na <#{config["help_forum_channel"]}>. 😔', ephemeral=True)
+      await interaction.response.send_message(f'Nikt jeszcze nie pomógł nikomu na <#{config["help_forum_channel"]}>. 😔', ephemeral=True)
       return
 
     result = 'Ranking 10 najbardziej pomocnych użytkowników w ostatnim czasie: ❤️\n'

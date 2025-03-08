@@ -30,7 +30,7 @@ def get_staff():
 class NoStaffError(discord.app_commands.CheckFailure):
   pass
 
-@hybrid_check
+@hybrid_check()
 def check_staff_nonempty(interaction):
   if all(not bot.get_guild(config['guild']).get_role(i).members for i in config['staff_roles']):
     raise NoStaffError()
@@ -46,14 +46,22 @@ async def setup(_bot):
     else:
       raise
 
-  @bot.tree.context_menu(name='Odśwież role')
-  @discord.app_commands.guilds(config['guild'])
-  async def update_roles(interaction, member: discord.Member):
+  async def fix_roles(interaction, member):
     logging.info(f'Received user request to update roles for {member.id}')
     await interaction.response.defer(ephemeral=True)
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
     await interaction.followup.send(f'Pomyślnie zaktualizowano role za warny i XP dla {member.mention}. 👌')
+
+  @bot.tree.command(name='fix-roles', description='Naprawia role użytkownika')
+  @discord.app_commands.guilds(config['guild'])
+  async def cmd_fix_roles(interaction, member: discord.Member | None):
+    await fix_roles(interaction, interaction.user if member is None else member)
+
+  @bot.tree.context_menu(name='Napraw role')
+  @discord.app_commands.guilds(config['guild'])
+  async def menu_fix_roles(interaction, member: discord.Member):
+    await fix_roles(interaction, member)
 
   @bot.listen()
   async def on_member_join(member):

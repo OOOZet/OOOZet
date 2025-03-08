@@ -20,7 +20,7 @@ from math import floor, sqrt
 from threading import Lock
 
 import console, database
-from common import config, parse_duration
+from common import config, hybrid_check, parse_duration
 
 bot = None
 lock = Lock()
@@ -56,9 +56,24 @@ async def update_roles():
   for member in bot.get_guild(config['guild']).members:
     await update_roles_for(member)
 
+class NoXpRolesError(discord.app_commands.CheckFailure):
+  pass
+
+@hybrid_check(is_consistent=True)
+def check_xp_roles(interaction):
+  if not config['xp_roles']:
+    raise NoXpRolesError()
+
 async def setup(_bot):
   global bot
   bot = _bot
+
+  @bot.on_check_failure
+  async def on_check_failure(interaction, error):
+    if isinstance(error, NoXpRolesError):
+      await interaction.response.send_message('Niestety nie ma żadnych ról, które mógłbyś dostać za XP. 😭', ephemeral=True)
+    else:
+      raise
 
   @bot.listen()
   async def on_message(msg):
@@ -129,11 +144,8 @@ async def setup(_bot):
     await interaction.response.send_message(result, ephemeral=True)
 
   @xp.command(description='Wyświetla role za XP')
+  @check_xp_roles
   async def roles(interaction):
-    if not config['xp_roles']:
-      await interaction.response.send_message('Niestety nie ma żadnych ról, które mógłbyś dostać za XP. 😭', ephemeral=True)
-      return
-
     result = 'Za zdobywanie kolejnych poziomów możesz dostać następujące role: 💰\n'
     for level, role in config['xp_roles']:
       result += f'- <@&{role}> za poziom **{level}**\n'

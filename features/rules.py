@@ -25,7 +25,7 @@ from features.utils import check_staff
 class NoRulesError(discord.app_commands.CheckFailure):
   pass
 
-@hybrid_check
+@hybrid_check(is_consistent=True)
 def check_rules(interaction):
   if not database.data.get('rules', []):
     raise NoRulesError()

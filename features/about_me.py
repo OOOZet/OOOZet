@@ -14,17 +14,53 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, json, subprocess
+import discord, json, logging, subprocess
 from datetime import datetime
 from io import StringIO
+from itertools import chain
 
-from common import redacted_config
+from common import config, HybridCheck, redacted_config
 
 async def setup(bot):
-  setup_time = datetime.now().astimezone()
+  @bot.tree.command(description='Wyświetla dostępne komendy bota')
+  async def help(interaction):
+    def is_available(cmd):
+      if isinstance(cmd, discord.app_commands.Group):
+        return False
 
-  @bot.tree.command(description='Wyświetla konfigurację bota')
-  async def config(interaction):
+      for check in cmd.checks:
+        if not isinstance(check, HybridCheck) or not check.is_consistent:
+          continue
+        try:
+          if not check(interaction):
+            return False
+        except discord.app_commands.CheckFailure:
+          return False
+        except Exception:
+          logging.exception(f'Got exception in consistent check')
+
+      return True
+
+    result = 'Lista dostępnych komend wpisywanych na kanale tekstowym: ⌨️\n'
+    cmds = sorted(filter(is_available, chain(
+      bot.tree.walk_commands(),
+      bot.tree.walk_commands(guild=discord.Object(config['guild'])),
+    )), key=lambda x: x.qualified_name)
+    for cmd in cmds:
+        result += '- `/' + ' '.join([cmd.qualified_name] + [f'<{i.name}>' if i.required else f'[{i.name}]' for i in cmd.parameters]) + f'` - {cmd.description}\n'
+
+    result += 'Komendy dostępne w zakładce "Aplikacje" po kliknięciu prawym przyciskiem myszy na użytkownika: 🖱️\n'
+    cmds = sorted(filter(is_available, chain(
+      bot.tree.walk_commands(type=discord.AppCommandType.user),
+      bot.tree.walk_commands(type=discord.AppCommandType.user, guild=discord.Object(config['guild'])),
+    )), key=lambda x: x.qualified_name)
+    for cmd in cmds:
+      result += f'- {cmd.name}\n'
+
+    await interaction.response.send_message(result, ephemeral=True)
+
+  @bot.tree.command(name='config', description='Wyświetla konfigurację bota')
+  async def config_(interaction):
     result = json.dumps(redacted_config(), indent=2)
     await interaction.response.send_message(
       'Załączam moją wewnętrzną konfigurację. 😉',
@@ -44,6 +80,8 @@ async def setup(bot):
   @bot.tree.command(description='Sprawdza ping bota')
   async def ping(interaction):
     await interaction.response.send_message(f'Pong! `{1000 * bot.latency:.0f}ms`', ephemeral=True)
+
+  setup_time = datetime.now().astimezone()
 
   @bot.tree.command(description='Sprawdza uptime serwera i bota')
   async def uptime(interaction):

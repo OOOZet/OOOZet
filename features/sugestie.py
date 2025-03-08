@@ -388,22 +388,22 @@ class NoSugestieError(discord.app_commands.CheckFailure):
     Eraseable = auto()
   filter: Filter
 
-@hybrid_check
+@hybrid_check()
 def check_any(interaction):
   if not database.data.get('sugestie', []):
     raise NoSugestieError(NoSugestieError.Filter.Any)
 
-@hybrid_check
+@hybrid_check()
 def check_pending(interaction):
   if not any(map(is_pending, database.data.get('sugestie', []))):
     raise NoSugestieError(NoSugestieError.Filter.Pending)
 
-@hybrid_check
+@hybrid_check()
 def check_annullable(interaction):
   if not any(map(is_annullable, database.data.get('sugestie', []))):
     raise NoSugestieError(NoSugestieError.Filter.Annullable)
 
-@hybrid_check
+@hybrid_check()
 def check_eraseable(interaction):
   if not any(map(is_eraseable_in(interaction), database.data.get('sugestie', []))):
     raise NoSugestieError(NoSugestieError.Filter.Eraseable)
