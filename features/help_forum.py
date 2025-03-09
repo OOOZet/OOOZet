@@ -99,7 +99,7 @@ async def setup(_bot):
         last_contrib = {}
         async for msg in post.history(limit=None, oldest_first=True):
           user = msg.author.id
-          if user == post.owner_id or msg.author.bot or (user in last_contrib and (msg.created_at - last_contrib[user]).total_seconds() < contrib_cooldown):
+          if user == post.owner_id or msg.author.bot or msg.is_system() or (user in last_contrib and (msg.created_at - last_contrib[user]).total_seconds() < contrib_cooldown):
             continue
           try:
             contribs[user] += 1
