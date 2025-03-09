@@ -86,7 +86,10 @@ def view_for(sugestia):
         elif interaction2.created_at >= sugestia['review_end']:
           await interaction2.response.send_message('Czas na opiniowanie tej sugestii już się skończył. ⏱️', ephemeral=True)
         else:
-          logging.info(f'{interaction2.user.id} has given their opinion of sugestia {sugestia["id"]}')
+          if text_input.value == sugestia['opinions'].get(interaction2.user.id, {}).get('text'):
+            logging.info(f'{interaction2.user.id} bumped their opinion of sugestia {sugestia["id"]}')
+          else:
+            logging.info(f'{interaction2.user.id} has given their opinion of sugestia {sugestia["id"]}')
           sugestia['opinions'][interaction2.user.id] = {
             'text': text_input.value,
             'time': interaction2.created_at,

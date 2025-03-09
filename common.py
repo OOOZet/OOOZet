@@ -153,6 +153,59 @@ def mention_message(client, channel, msg):
 def debacktick(string):
   return string.replace('`', '')
 
+def pages_view(init_page, pagec, on_select_page, owner):
+  view = discord.ui.View()
+  async def interaction_check(interaction):
+    return interaction.user == owner
+  view.interaction_check = interaction_check
+
+  if pagec <= 1:
+    return view
+
+  curr_page = init_page
+  async def select(interaction, page):
+    nonlocal curr_page
+    curr_page = page
+    refresh()
+    await on_select_page(interaction, curr_page)
+
+  first = discord.ui.Button(label='⇤')
+  async def callback(interaction):
+    await select(interaction, 0)
+  first.callback = callback
+  view.add_item(first)
+
+  prev = discord.ui.Button(label='←')
+  async def callback(interaction):
+    await select(interaction, curr_page - 1)
+  prev.callback = callback
+  view.add_item(prev)
+
+  indicator = discord.ui.Button(disabled=True)
+  view.add_item(indicator)
+
+  next = discord.ui.Button(label='→')
+  async def callback(interaction):
+    await select(interaction, curr_page + 1)
+  next.callback = callback
+  view.add_item(next)
+
+  last = discord.ui.Button(label='⇥')
+  async def callback(interaction):
+    await select(interaction, pagec - 1)
+  last.callback = callback
+  view.add_item(last)
+
+  def refresh():
+    first.disabled = curr_page == 0
+    prev.disabled = curr_page - 1 < 0
+    indicator.label = f'Strona {curr_page + 1} z {pagec}'
+    next.disabled = curr_page + 1 >= pagec
+    last.disabled = curr_page == pagec - 1
+  refresh()
+
+  return view
+
 def select_view(select_options, callback, owner):
   view = discord.ui.View()
   async def interaction_check(interaction):
@@ -166,35 +219,12 @@ def select_view(select_options, callback, owner):
   select.options = select_options[:25]
   view.add_item(select)
 
-  pagec = (len(select_options) + 25 - 1) // 25
-  if pagec > 1:
-    curr_page = 0
-    async def refresh(interaction):
-      await interaction.response.defer()
-      select.options = select_options[25 * curr_page : 25 * (curr_page + 1)]
-      prev.disabled = curr_page - 1 < 0
-      indicator.label = f'Strona {curr_page + 1} z {pagec}'
-      next.disabled = curr_page + 1 >= pagec
-      await interaction.edit_original_response(view=view)
-
-    prev = discord.ui.Button(label='←', disabled=True)
-    async def prev_callback(interaction):
-      nonlocal curr_page
-      curr_page -= 1
-      await refresh(interaction)
-    prev.callback = prev_callback
-    view.add_item(prev)
-
-    indicator = discord.ui.Button(label=f'Strona 1 z {pagec}', disabled=True)
-    view.add_item(indicator)
-
-    next = discord.ui.Button(label='→')
-    async def next_callback(interaction):
-      nonlocal curr_page
-      curr_page += 1
-      await refresh(interaction)
-    next.callback = next_callback
-    view.add_item(next)
+  async def refresh(interaction, page):
+    await interaction.response.defer()
+    select.options = select_options[25 * page : 25 * (page + 1)]
+    await interaction.edit_original_response(view=view)
+  for i in pages_view(0, (len(select_options) + 25 - 1) // 25, refresh, None).children:
+    view.add_item(i)
 
   return view
 

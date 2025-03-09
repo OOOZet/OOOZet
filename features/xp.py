@@ -20,7 +20,7 @@ from math import floor, sqrt
 from threading import Lock
 
 import console, database
-from common import config, hybrid_check, parse_duration
+from common import config, hybrid_check, pages_view, parse_duration
 
 bot = None
 lock = Lock()
@@ -112,36 +112,43 @@ async def setup(_bot):
   xp = discord.app_commands.Group(name='xp', description='Komendy do XP')
   bot.tree.add_command(xp)
 
-  async def show(interaction, user):
-    level = xp_to_level(user.xp)
-    left = level_to_xp(level + 1) - user.xp
-    if user.bot:
-      await interaction.response.send_message(f'{user.mention} jest botem i nie może zbierać XP… 😐', ephemeral=True)
-    elif user == interaction.user:
-      await interaction.response.send_message(f'Masz **{user.xp} XP** i tym samym **poziom {level}**. Do następnego brakuje ci jeszcze **{left} XP**. 📈', ephemeral=True)
-    else:
-      await interaction.response.send_message(f'{user.mention} ma **{user.xp} XP** i tym samym **poziom {level}**. Do następnego brakuje mu/jej jeszcze **{left} XP**. 📈', ephemeral=True)
+  async def show(interaction, marked_user):
+    if marked_user.bot:
+      await interaction.response.send_message(f'{marked_user.mention} jest botem i nie może zbierać XP… 😐', ephemeral=True)
+      return
 
-  @xp.command(name='show', description='Pokazuje XP użytkownika')
+    ranking = sorted(database.data['xp'].items(), key=lambda x: x[1], reverse=True)
+    def contents_of(page):
+      result = 'Ranking użytkowników według XP: 🏆\n'
+      for i in range(20 * page, 20 * (page + 1)):
+        try:
+          user, xp = ranking[i]
+        except IndexError:
+          break
+        level = xp_to_level(xp)
+        left = level_to_xp(level + 1) - xp
+        result += f'{i + 1}. <@{user}> z **{xp} XP** i poziomem **{level}** - do następnego **{left} XP**' + (' **⬅️**\n' if user == marked_user.id else '\n')
+      return result
+
+    try:
+      init_page = next(i for i, entry in enumerate(ranking) if entry[0] == marked_user.id) // 20
+    except StopIteration:
+      await interaction.response.send_message(f'{marked_user.mention} nie zebrał jeszcze żadnego XP. 😴', ephemeral=True)
+      return
+    async def on_select_page(interaction2, page):
+      await interaction2.response.defer()
+      await interaction2.edit_original_response(content=contents_of(page), view=view)
+    view = pages_view(init_page, (len(ranking) + 20 - 1) // 20, on_select_page, interaction.user)
+
+    await interaction.response.send_message(contents_of(init_page), view=view, ephemeral=True)
+
+  @xp.command(name='show', description='Pokazuje ranking XP z zaznaczonym użytkownikiem')
   async def cmd_show(interaction, user: discord.User | None):
     await show(interaction, interaction.user if user is None else user)
 
   @bot.tree.context_menu(name='Pokaż XP')
   async def menu_show(interaction, user: discord.User):
     await show(interaction, user)
-
-  @xp.command(description='Wyświetla 10 użytkowników z najwyższym XP')
-  async def leaderboard(interaction):
-    if not database.data.get('xp', {}):
-      await interaction.response.send_message('Nikt jeszcze nie zebrał żadnego XP. 😴', ephemeral=True)
-      return
-
-    result = 'Ranking 10 użytkowników z najwyższym XP: 🏆\n'
-    ranking = sorted(database.data['xp'].items(), key=lambda x: x[1], reverse=True)[:10]
-    for i, entry in enumerate(ranking):
-      user, xp = entry
-      result += f'{i + 1}. <@{user}> z **{xp} XP** i poziomem **{xp_to_level(xp)}**\n'
-    await interaction.response.send_message(result, ephemeral=True)
 
   @xp.command(description='Wyświetla role za XP')
   @check_xp_roles
