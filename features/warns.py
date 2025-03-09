@@ -93,6 +93,9 @@ async def setup(_bot):
 
   async def unwarn(interaction, user):
     check_warns_for(user)
+    if user == interaction.user and interaction.user != interaction.guild.owner:
+      await interaction.response.send_message('Nie możesz odbierać sobie warnów. 😒', ephemeral=True)
+      return
 
     async def callback(interaction2, choice):
       warn = next(i for i in database.data['warns'][user.id] if id(i) == int(choice))
