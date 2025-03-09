@@ -18,7 +18,7 @@ import asyncio, discord, logging
 from datetime import datetime, timedelta
 
 import console, database
-from common import config, hybrid_check, parse_duration
+from common import config, hybrid_check, pages_view, parse_duration
 
 bot = None
 
@@ -36,7 +36,7 @@ async def setup(_bot):
 
   @bot.on_check_failure
   async def on_check_failure(interaction, error):
-    if isinstance(error, NoHelpForumError):
+    if isinstance(error, NoHelpForumChannelError):
       await interaction.response.send_message('Na tym serwerze nie zostało jeszcze stworzone forum pomocy. 😔', ephemeral=True)
     else:
       raise
@@ -50,7 +50,7 @@ async def setup(_bot):
   def get_ranking():
     return sorted(database.data.get('help_forum_karma', {}).items(), key=lambda x: x[1], reverse=True)
 
-  @bot.tree.command(description='Wyświetla 10 najbardziej pomocnych użytkowników w ostatnim czasie')
+  @bot.tree.command(description='Wyświetla najbardziej pomocnych użytkowników w ostatnim czasie')
   @check_help_forum_channel
   async def helpful(interaction):
     ranking = get_ranking()
@@ -58,10 +58,22 @@ async def setup(_bot):
       await interaction.response.send_message(f'Nikt jeszcze nie pomógł nikomu na <#{config["help_forum_channel"]}>. 😔', ephemeral=True)
       return
 
-    result = 'Ranking 10 najbardziej pomocnych użytkowników w ostatnim czasie: ❤️\n'
-    for i, entry in enumerate(ranking[:10]):
-      result += f'{i + 1}. <@{entry[0]}> z **{entry[1]:.2f}** rozwiązanymi pytaniami\n'
-    await interaction.response.send_message(result, ephemeral=True)
+    def contents_of(page):
+      result = 'Ranking najbardziej pomocnych użytkowników w ostatnim czasie: ❤️\n'
+      for i in range(10 * page, 10 * (page + 1)):
+        try:
+          user, karma = ranking[i]
+        except IndexError:
+          break
+        result += f'{i + 1}. <@{user}> z **{karma:.2f}** rozwiązanymi pytaniami\n'
+      return result
+
+    async def on_select_page(interaction2, page):
+      await interaction2.response.defer()
+      await interaction2.edit_original_response(content=contents_of(page), view=view)
+    view = pages_view(0, (len(ranking) + 10 - 1) // 10, on_select_page, interaction.user)
+
+    await interaction.response.send_message(contents_of(0), view=view, ephemeral=True)
 
   @discord.ext.tasks.loop(seconds=parse_duration(config['help_forum_eval_rate']))
   async def eval():

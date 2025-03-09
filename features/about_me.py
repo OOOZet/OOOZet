@@ -36,7 +36,7 @@ async def setup(bot):
             return False
         except discord.app_commands.CheckFailure:
           return False
-        except Exception:
+        except:
           logging.exception(f'Got exception in consistent check')
 
       return True
