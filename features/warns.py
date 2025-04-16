@@ -17,27 +17,21 @@
 import asyncio, discord, logging, random
 from dataclasses import dataclass
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 import console, database
-from common import config, debacktick, format_datetime, limit_len, mention_datetime, select_view
-from features.utils import check_staff
+from common import config, debacktick, format_datetime, limit_len, mention_date, mention_datetime, pages_view, select_view
+from features.utils import check_staff, is_staff
 
 bot = None
-
-@dataclass
-class NoWarnsError(discord.app_commands.CheckFailure):
-  user: discord.User
-
-def check_warns_for(user):
-  if not database.data.get('warns', {}).get(user.id, []):
-    raise NoWarnsError(user)
 
 async def update_roles_for(member):
   logging.info(f'Updating warn roles for {member.id}')
   assert member.guild.id == config['guild']
   roles = [discord.Object(i) for i in config['warn_roles']]
+  do_expires(member.id)
   await member.remove_roles(*roles)
-  count = len(database.data.get('warns', {}).get(member.id, []))
+  count = sum(not i['expired'] for i in database.data.get('warns', {}).get(member.id, []))
   if count > 0 and roles:
     await member.add_roles(roles[min(count, len(roles)) - 1])
 
@@ -46,30 +40,61 @@ async def update_roles():
   for member in bot.get_guild(config['guild']).members:
     await update_roles_for(member)
 
+def do_expires(user): # Restarting this algorithm at any point during its execution is corruption-free, so we don't need to acquire database.lock.
+  warns = database.data.get('warns', {}).get(user)
+  if not warns:
+    return
+
+  barriers = []
+  for warn in warns:
+    barriers.append(warn['time'])
+    if warn['expired']:
+      barriers.append(warn['expired'])
+  barriers.sort()
+
+  interval = relativedelta(**config['warn_expire_interval'])
+  now = datetime.now().astimezone()
+
+  time = datetime.fromtimestamp(0).astimezone()
+  i = 0
+  for warn in warns:
+    if warn['expired']:
+      continue
+    time = max(time, warn['time'])
+    while i < len(barriers) and barriers[i] <= time:
+      i += 1
+    while i < len(barriers) and barriers[i] < time + interval:
+      time = barriers[i]
+      i += 1
+    time += interval
+    if time > now:
+      break
+    warn['expired'] = time
+
+def do_expires_all():
+  for user in database.data.get('warns', {}):
+    do_expires(user)
+
 async def setup(_bot):
   global bot
   bot = _bot
-
-  @bot.on_check_failure
-  async def on_check_failure(interaction, error):
-    if isinstance(error, NoWarnsError):
-      await interaction.response.send_message(f'{error.user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
-    else:
-      raise
 
   async def warn(interaction, user, reason):
     logging.info(f'Adding warn for {user.id} with reason {reason!r}')
     warn = {
       'time': datetime.now().astimezone(),
       'reason': reason,
+      'expired': None,
     }
     database.data.setdefault('warns', {}).setdefault(user.id, []).append(warn)
+    database.data['warns'][user.id].sort(key=lambda x: x['time'])
     database.should_save = True
 
     if (member := bot.get_guild(config['guild']).get_member(user.id)) is not None:
       await update_roles_for(member)
 
-    count = len(database.data['warns'][user.id])
+    do_expires(user.id)
+    count = sum(not i['expired'] for i in database.data['warns'][user.id])
     await interaction.response.send_message(f'{user.mention} właśnie dostał swojego **{count}-ego** warna za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
 
   @bot.tree.command(name='warn', description='Warnuje użytkownika')
@@ -91,16 +116,19 @@ async def setup(_bot):
     modal.add_item(text_input)
     await interaction.response.send_modal(modal)
 
-  async def unwarn(interaction, user):
-    check_warns_for(user)
+  async def erase_warn(interaction, user):
     if user == interaction.user and interaction.user != interaction.guild.owner:
-      await interaction.response.send_message('Nie możesz odbierać sobie warnów. 😒', ephemeral=True)
+      await interaction.response.send_message('Nie możesz usuwać sobie warnów. 😒', ephemeral=True)
+      return
+    elif all(i['expired'] for i in database.data.get('warns', {}).get(user.id, [])):
+      await interaction.response.send_message(f'{user.mention} nie ma żadnych niewygasłych warnów, które możesz usunąć… 🤨', ephemeral=True)
       return
 
     async def callback(interaction2, choice):
       warn = next(i for i in database.data['warns'][user.id] if id(i) == int(choice))
+      assert not warn['expired']
 
-      logging.info(f'Removing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
+      logging.info(f'Erasing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
       database.data['warns'][user.id].remove(warn)
       database.should_save = True
 
@@ -109,10 +137,10 @@ async def setup(_bot):
 
       reason = debacktick(warn['reason'])
       time = mention_datetime(warn['time'])
-      await interaction.edit_original_response(content=f'Pomyślnie odebrano warna `{reason}` z dnia {time} użytkownikowi {user.mention}! 🥳', view=None)
+      await interaction.edit_original_response(content=f'Pomyślnie usunięto warna `{reason}` z dnia {time} użytkownikowi {user.mention}. 🙄', view=None)
       await interaction2.response.defer()
 
-    await interaction.response.send_message(f'Którego warna chcesz odebrać użytkownikowi {user.mention}?', view=select_view(
+    await interaction.response.send_message(f'Którego warna chcesz usunąć użytkownikowi {user.mention}?', view=select_view(
       [
         discord.SelectOption(
           label=limit_len(warn['reason']),
@@ -125,33 +153,62 @@ async def setup(_bot):
       interaction.user,
     ))
 
-  @bot.tree.command(name='unwarn', description='Odbiera warna użytkownikowi')
+  @bot.tree.command(name='erase-warn', description='Usuwa błędnie nadanego warna')
   @discord.app_commands.guilds(config['guild'])
-  @check_staff('odbierania warnów')
-  async def cmd_unwarn(interaction, user: discord.User):
-    await unwarn(interaction, user)
+  @check_staff('usuwania warnów')
+  async def cmd_erase_warn(interaction, user: discord.User):
+    await erase_warn(interaction, user)
 
-  @bot.tree.context_menu(name='Odbierz warna')
+  @bot.tree.context_menu(name='Usuń warna')
   @discord.app_commands.guilds(config['guild'])
-  @check_staff('odbierania warnów')
-  async def menu_unwarn(interaction, user: discord.User):
-    await unwarn(interaction, user)
+  @check_staff('usuwania warnów')
+  async def menu_erase_warn(interaction, user: discord.User):
+    await erase_warn(interaction, user)
 
   async def warns(interaction, user):
-    check_warns_for(user)
+    do_expires(user.id)
+    active, expired = [], []
+    for warn in database.data.get('warns', {}).get(user.id, []):
+      if warn['expired']:
+        expired.append(warn)
+      else:
+        active.append(warn)
 
-    result = random.choice([
-      f'{user.mention} ma już na swoim koncie parę złych uczynków… 😔\n',
-      f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕\n',
-      f'Na {user.mention} czeka już tylko czyściec… 😩\n',
-    ])
+    pages = ['']
+    def append(line):
+      if len(pages[-1]) + len(line) > 2000:
+        pages.append('')
+      pages[-1] += line
 
-    for warn in database.data['warns'][user.id]:
-      reason = debacktick(warn['reason'])
-      time = mention_datetime(warn["time"])
-      result += f'- `{reason}` w dniu {time}\n'
+    if active:
+      append(random.choice([
+        f'{user.mention} ma już na swoim koncie parę złych uczynków… 😔\n',
+        f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕\n',
+        f'Na {user.mention} czeka już tylko czyściec… 😩\n',
+      ]))
+      for warn in active:
+        reason = debacktick(warn['reason'])
+        time = mention_datetime(warn['time'])
+        append(f'- `{reason}` w dniu {time}\n')
 
-    await interaction.response.send_message(result, ephemeral=True)
+    if expired and is_staff(interaction.user):
+      append(f'Dawne warny użytkownika {user.mention}: 📜\n')
+      for warn in reversed(expired):
+        reason = debacktick(warn['reason'])
+        time = mention_datetime(warn['time'])
+        expired = mention_date(warn['expired'])
+        append(f'- `{reason}` z dnia {time} wygasł {expired}.\n')
+
+    if pages == ['']:
+      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych warnów! 😇', ephemeral=True)
+      return
+
+    async def on_select_page(interaction2, page):
+      await interaction2.response.defer()
+      await interaction2.edit_original_response(content=pages[page], view=view)
+    view = pages_view(0, len(pages), on_select_page, interaction.user)
+
+    await interaction.response.send_message(pages[0], view=view, ephemeral=True)
 
   @bot.tree.command(name='warns', description='Pokazuje warny użytkownika')
   async def cmd_warns(interaction, user: discord.User | None):
@@ -163,4 +220,5 @@ async def setup(_bot):
 
 console.begin('warns')
 console.register('update_roles', None, 'updates warn roles for all members', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())
+console.register('do_expires_all', None, 'applies any pending expires', do_expires_all)
 console.end()

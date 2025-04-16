@@ -43,6 +43,7 @@ config = {
   'media_channels': [],                      # Kanały, na które można wysyłać tylko zdjęcia i filmy
 
   'warn_roles': [],                          # Role kosmetyczne wskazujące na liczbę warnów użytkownika
+  'warn_expire_interval': { 'months': 1 },   # Obiekt relativedelta określający odstęp czasu od ostatniej zmianie w liczbie warnów użytkownika, po którym wygasa najstarszy warn
   'counting_channel': None,                  # Kanał "#liczenie"
   'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
 
@@ -146,6 +147,9 @@ def format_datetime(datetime):
 def mention_datetime(datetime, *, relative=False):
   timestamp = int(datetime.timestamp())
   return f'<t:{timestamp}:R>' if relative else f'<t:{timestamp}>'
+
+def mention_date(datetime):
+  return f'<t:{int(datetime.timestamp())}:D>'
 
 def mention_message(client, channel, msg):
   return client.get_partial_messageable(channel).get_partial_message(msg).jump_url
