@@ -63,13 +63,14 @@ def do_expires(user): # Restarting this algorithm at any point during its execut
     time = max(time, warn['time'])
     while i < len(barriers) and barriers[i] <= time:
       i += 1
-    while i < len(barriers) and barriers[i] < time + interval:
+    while i < len(barriers) and barriers[i] <= time + interval:
       time = barriers[i]
       i += 1
     time += interval
     if time > now:
       break
     warn['expired'] = time
+  database.should_save = True
 
 def do_expires_all():
   for user in database.data.get('warns', {}):
@@ -82,7 +83,7 @@ async def setup(_bot):
   async def warn(interaction, user, reason):
     logging.info(f'Adding warn for {user.id} with reason {reason!r}')
     warn = {
-      'time': datetime.now().astimezone(),
+      'time': interaction.created_at,
       'reason': reason,
       'expired': None,
     }

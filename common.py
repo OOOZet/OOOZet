@@ -65,7 +65,7 @@ config = {
 
   'websub_host': None,                       # Adres tego serwera
   'websub_port': 13579,                      # Port, na którym będzie odpalony serwer WebSub
-  'websub_lease_time': '7d',                 # Domyślny czas ważności subskrypcji WebSub
+  'websub_lease_time': '1d',                 # Domyślny czas ważności subskrypcji WebSub
   'websub_sub_retries': [                    # Opóźnienia kolejnych prób zasubskrybowania
     '5s', '15s', '30s', '1m',
     '5m', '15m', '30m', '1h'
@@ -75,7 +75,7 @@ config = {
   'oki_channel': None,                       # Kanał, na który są wysyłane ogłoszenia o transmisjach na żywo i nowych filmach OKI
   'oki_role': None,                          # Rola, która jest pingowana przy każdym ogłoszeniu o nowym filmie lub transmisji
   'oki_youtube': 'UCw1Z4iA0T-QNaJ-sEOXeYCw', # ID (a nie nazwa użytkownika) kanału YouTube
-  'youtube_advance': '5m',                   # Wyprzedzenie, z którym są wysyłane ogłoszenia o transmisjach
+  'youtube_advance': '15m',                  # Wyprzedzenie, z którym są wysyłane ogłoszenia o transmisjach
   'youtube_api_key': None,                   # Klucz dewelopera do API YouTube
 
   'codeforces_channel': None,                # Kanał, na który są wysyłane przypomnienia o rundach na Codeforces
