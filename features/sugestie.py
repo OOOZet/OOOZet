@@ -345,7 +345,7 @@ async def clean():
           image_format = None
 
       await msg.delete()
-      if msg.author.bot:
+      if msg.author.bot or not msg.content:
         continue
 
       embed = discord.Embed(title='Sugestia', description=msg.content)

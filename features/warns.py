@@ -187,7 +187,7 @@ async def setup(_bot):
         f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕\n',
         f'Na {user.mention} czeka już tylko czyściec… 😩\n',
       ]))
-      for warn in active:
+      for warn in reversed(active):
         reason = debacktick(warn['reason'])
         time = mention_datetime(warn['time'])
         append(f'- `{reason}` w dniu {time}\n')
