@@ -179,12 +179,12 @@ async def setup(_bot):
     if interaction.user == user:
       await interaction.response.send_message('Nie możesz zbanować samego siebie… 🤨', ephemeral=True)
     elif isinstance(user, discord.Member) and interaction.user.top_role <= user.top_role and interaction.user != interaction.guild.owner:
-      await interaction.response.send_message(f'Nie jesteś wyżej w hierarchii od {member.mention}… 🤨', ephemeral=True)
+      await interaction.response.send_message(f'Nie jesteś wyżej w hierarchii od {user.mention}… 🤨', ephemeral=True)
     else:
       try:
         await interaction.guild.ban(user, reason=f'{reason} — {interaction.user.our_name}', delete_message_seconds=0)
       except discord.Forbidden:
-        await interaction.response.send_message(f'Nie mam uprawnień, żeby zbanować {member.mention}… 🧐', ephemeral=True)
+        await interaction.response.send_message(f'Nie mam uprawnień, żeby zbanować {user.mention}… 🧐', ephemeral=True)
       else:
         logging.info(f'{interaction.user.id} banned {user.id} for {reason!r}')
         await interaction.response.send_message(f'Pomyślnie zbanowano {user.mention} za `{debacktick(reason)}`. 😒', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
