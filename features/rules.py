@@ -207,7 +207,7 @@ async def setup(bot):
 
         select = discord.ui.Select()
         select.callback = callback
-        for sugestia in filter(sugestie.is_pending, database.data['sugestie']):
+        for sugestia in filter(sugestie.is_pending, reversed(database.data['sugestie'])):
           select.add_option(label=limit_len(sugestia['text']), value=sugestia['id'], description=format_datetime(sugestia['time']))
         view.add_item(select)
 
