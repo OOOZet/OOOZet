@@ -130,7 +130,7 @@ async def setup(bot):
     channel = interaction.guild.rules_channel
     if channel is None:
       await interaction.followup.send('Nie został jeszcze ustawiony żaden kanał z zasadami… 🤨', ephemeral=True)
-      return False
+      return
 
     await channel.purge() # This will delete at most 100 messages in case there was a mistake.
     text = max(database.data['rules'], key=lambda x: x['time'])['text']
@@ -138,7 +138,6 @@ async def setup(bot):
       await channel.send(fragment)
 
     await interaction.followup.send('Pomyślnie zaktualizowano kanał z regulaminem. 🫡', ephemeral=True)
-    return True
 
   @rules.command(name='resend', description='Aktualizuje kanał z regulaminem')
   @check_rules
@@ -181,8 +180,7 @@ async def setup(bot):
       else:
         await interaction.response.send_message('Pomyślnie ustanowiono nowy regulamin. 🫡')
 
-      if await resend(interaction2):
-        await (await interaction.guild.rules_channel.send('@everyone', allowed_mentions=discord.AllowedMentions.all())).delete()
+      await resend(interaction2)
 
     if ile_sugestii == 0:
       await on_submit(interaction)

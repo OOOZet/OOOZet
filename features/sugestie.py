@@ -139,7 +139,7 @@ def view_for(sugestia):
         await interaction.response.send_message('Którą opinię chcesz usunąć?', view=select_view(
           [
             discord.SelectOption(label=limit_len(opinion['text']), value=author, description=(await bot.fetch_user(author)).our_name)
-            for author, opinion in sugestia['opinions'].items()
+            for author, opinion in reversed(sugestia['opinions'].items())
           ],
           callback,
           interaction.user,
