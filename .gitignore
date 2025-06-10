@@ -1,4 +1,4 @@
 __pycache__/
-.config.json
+config.json
 database.json
-database.json.old
+database.json.*

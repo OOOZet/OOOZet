@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import json, logging, os, threading
-from datetime import datetime
+import json, logging, os, shutil, threading
+from datetime import date, datetime
 
 import console
 from common import config, parse_duration
@@ -55,9 +55,6 @@ def save():
     global should_save
     should_save = False
 
-    if os.path.exists(config['database']):
-      os.replace(config['database'], config['database'] + '.old')
-
     class Encoder(json.JSONEncoder):
       def default(self, value):
         if isinstance(value, set):
@@ -66,8 +63,16 @@ def save():
           return {'__datetime__': value.isoformat()}
         else:
           return super().default(value)
-    with open(config['database'], 'x') as file:
+    # This is not an atomic disk operation, so if we were to save directly to
+    # database.json, then there could be a power outage and we would end up
+    # having a truncated database to load on next boot.
+    with open(config['database'] + '.new', 'w') as file:
       json.dump(data, file, cls=Encoder)
+    try:
+      shutil.copy2(config['database'], config['database'] + '.' + date.today().isoformat())
+    except FileNotFoundError:
+      pass
+    os.replace(config['database'] + '.new', config['database'])
 
 autosave_thread = None
 autosave_stop = None

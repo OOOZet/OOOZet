@@ -45,7 +45,7 @@ async def setup(bot):
       return
 
     if not contest.is_niche and config['codeforces_role'] is not None:
-      mention = f'<@&{config["codeforces_role"]}>' # TODO: seperate roles for div1, div2 etc
+      mention = f'<@&{config["codeforces_role"]}>'
     else:
       mention = ''
     relative_time = mention_datetime(contest.time, relative=True)
