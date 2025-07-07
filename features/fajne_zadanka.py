@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from io import StringIO
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import console, database
 from common import config, parse_duration
@@ -41,6 +41,7 @@ async def fetch_json(url):
 async def find_problem(url):
   url = urlparse(unquote(url))
   path = os.path.normpath(url.path).replace('//', '/')
+  query = parse_qs(url.query, keep_blank_values=True)
 
   if url.hostname == 'codeforces.com':
     if (match := re.fullmatch('/(?:contest|gym)/([0-9]+)/problem/([A-Za-z0-9]+)', path)) or \
@@ -87,6 +88,16 @@ async def find_problem(url):
     if match := re.match('(?:/contest/[0-9]+)?/problem/([0-9]+)', path):
       url = f'https://qoj.ac/problem/{match[1]}'
       return url, (await fetch_html(url)).find(class_='page-header').text.partition('.')[2].strip()
+
+  elif url.hostname == 'cses.fi':
+    if match := re.match('/problemset/(?:task|stats)/([0-9]+)', path):
+      url = f'https://cses.fi/problemset/task/{int(match[1])}'
+      return url, (await fetch_html(url)).title.text.partition(' - ')[2]
+
+  elif url.hostname == 'usaco.org':
+    if path == '/index.php' and query.get('page', [''])[-1] == 'viewproblem2' and (match := re.match('([0-9]+)', query.get('cpid', [''])[-1])):
+      url = f'https://usaco.org/index.php?page=viewproblem2&cpid={int(match[1])}'
+      return url, (await fetch_html(url)).find(class_='panel').find_all('h2')[-1].text.partition('.')[2].strip()
 
 async def fix(id):
   msg = await bot.get_channel(config['fajne_zadanka_channel']).fetch_message(id)
