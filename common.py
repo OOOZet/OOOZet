@@ -36,6 +36,7 @@ config = {
   'guild': None,                             # Serwer, na którym rezyduje bot
   'staff_roles': [],                         # Role, których członkowie należą do administracji
   'server_maintainer': None,                 # ID osoby odpowiedzialnej za logi bota
+  'timezone': 'Europe/Warsaw',               # Strefa czasowa IANA, w której żyje społeczność
 
   'alarm_cooldown': '5m',                    # Cooldown dla komendy /alarm
   'timeout_role': None,                      # Rola kosmetyczna pokazująca, czy użytkownik ma timeouta
@@ -96,6 +97,11 @@ config = {
   'help_forum_eval_max_age': '1y',           # Maksymalny wiek postów branych pod uwagę w rankingu pomagaczy
   'help_forum_contrib_cooldown': '1m',       # Odstęp czasu, po którym można ponownie dostać punkt udziału w rozwiązywaniu pytania
   'help_forum_eval_rate': '1d',              # Częstotliwość aktualizowania rankingu pomagaczy
+
+  'ping_race_role': None,                    # Rola pingowana w konkursie na najszybszy ping dnia
+  'ping_race_hour': 21,                      # Godzina, o której należy spingować tę rolę
+  'ping_race_minute': 37,                    # Minuta, o której należy spingować tę rolę
+  'ping_race_max_age_days': 90,              # Maksymalny wiek pingów branych pod uwagę w rankingu
 }
 
 def redacted_config():

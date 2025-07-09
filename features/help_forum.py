@@ -17,7 +17,7 @@
 import asyncio, discord, logging
 from datetime import datetime, timedelta
 
-import console, database
+import database
 from common import config, hybrid_check, pages_view, parse_duration
 
 bot = None
