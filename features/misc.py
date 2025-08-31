@@ -196,7 +196,8 @@ async def setup(_bot):
     await ban(interaction, user, reason)
 
   @bot.tree.context_menu(name='Zbanuj')
-  @discord.app_commands.guild_only
+  # @discord.app_commands.guild_only
+  @discord.app_commands.guilds(config['guild']) # HACK: Max number of global context menu commands is 5.
   @check_staff('banowania')
   async def menu_ban(interaction, user: discord.User):
     async def on_submit(interaction2):

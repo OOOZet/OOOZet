@@ -27,16 +27,12 @@ from common import config, parse_duration
 bot = None
 
 async def fetch_html(url):
-  async with aiohttp.ClientSession() as session:
-    response = await session.get(url)
-    response.raise_for_status()
-    return BeautifulSoup(await response.text(), 'lxml')
+  async with aiohttp.ClientSession(raise_for_status=True) as session:
+    return BeautifulSoup(await (await session.get(url)).text(), 'lxml')
 
 async def fetch_json(url):
-  async with aiohttp.ClientSession() as session:
-    response = await session.get(url)
-    response.raise_for_status()
-    return await response.json()
+  async with aiohttp.ClientSession(raise_for_status=True) as session:
+    return await (await session.get(url)).json()
 
 async def find_problem(url):
   url = urlparse(unquote(url))
@@ -69,7 +65,7 @@ async def find_problem(url):
 
     elif match := re.match('/contests/([^/]+)', path):
       url = f'https://atcoder.jp/contests/{match[1].lower()}'
-      return url, (await fetch_html(url)).find(class_='contest-title').text
+      return url, (await fetch_html(url)).find(class_='contest-title').text.strip()
 
   elif url.hostname == 'szkopul.edu.pl':
     if match := re.match('/problemset/problem/([^/]+)/site', path):

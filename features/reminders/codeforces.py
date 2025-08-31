@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import console, database
-from common import config, debacktick, mention_datetime, parse_duration
+from common import config, mention_datetime, parse_duration
 
 bot = None
 
@@ -55,18 +55,15 @@ async def send_national_standings(contest):
     json = await (await session.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}')).json()
   if json['status'] != 'OK':
     if json['comment'] != 'contestId: Rating changes are unavailable for this contest':
-      logging.error(f'Codeforces contest rating changes request failed: {json["comment"]!r}')
-      return True
+      raise Exception(f'Rating changes request failed: {json["comment"]!r}')
   elif not json['result']:
-    logging.error('Codeforces contest rating changes are not available yet')
-    return True
+    raise Exception('Rating changes are not available yet')
   rating_changes = {i['handle']: i for i in json.get('result', [])}
 
   async with aiohttp.ClientSession() as session:
     standings = await (await session.get(f'https://codeforces.com/api/contest.standings?contestId={contest.id}&participantTypes=CONTESTANT,OUT_OF_COMPETITION')).json()
   if standings['status'] != 'OK':
-    logging.error(f'Codeforces contest standings request failed: {standings["comment"]!r}')
-    return True
+    raise Exception(f'Standings request failed: {standings["comment"]!r}')
 
   user_infos = {}
 
@@ -80,8 +77,7 @@ async def send_national_standings(contest):
     async with aiohttp.ClientSession() as session:
       json = await (await session.get('https://codeforces.com/api/user.info?handles=' + ';'.join(batch))).json()
     if json['status'] != 'OK':
-      logging.error(f'Codeforces user info request failed: {json["comment"]!r}')
-      return True
+      raise Exception(f'User info request failed: {json["comment"]!r}')
 
     assert len(batch) == len(json['result'])
     user_infos.update(zip(batch, json['result']))
@@ -179,7 +175,11 @@ async def setup(_bot):
         logging.info(f'Adding Codeforces contest {contest.id} to watchlist')
         watchlist.add(contest.id)
       elif contest.id in watchlist:
-        if not await send_national_standings(contest):
+        try:
+          await send_national_standings(contest)
+        except:
+          logging.exception('Got exception while sending Codeforces national standings')
+        else:
           watchlist.remove(contest.id)
 
   poll.start()
