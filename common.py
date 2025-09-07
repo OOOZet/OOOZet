@@ -87,7 +87,7 @@ config = {
   'atcoder_channel': None,                   # Kanał, na który są wysyłane przypomnienia o kontestach na AtCoder
   'atcoder_role': None,                      # Rola, która jest pingowana w przypomnieniach o kontestach
   'atcoder_advance': '15m',                  # Wyprzedzenie, z którym są wysyłane przypomnienia o kontestach
-  'atcoder_poll_rate': '1d',                 # Częstotliwość aktualizowania listy kontestów
+  'atcoder_poll_rate': '1h',                 # Częstotliwość aktualizowania listy kontestów
   'clist_api_key': None,                     # Klucz do API clist.by
   'clist_username': None,                    # Konto clist.by, z którego pochodzi klucz API
 
