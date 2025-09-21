@@ -54,6 +54,8 @@ async def send_national_standings(contest):
   if config['atcoder_channel'] is None:
     return
 
+  standings = []
+
   async with aiohttp.ClientSession() as session:
     url_suffix = f'&format=json&api_key={config["clist_api_key"]}&username={config["clist_username"]}'
 
@@ -62,29 +64,12 @@ async def send_national_standings(contest):
       raise Exception(f'No unique contest in {json!r}')
     clist_id = json['objects'][0]['id']
 
-    standings = {}
-
-    order_by = 'new_rating'
-    offset = 0
-    while True:
-      url = f'https://clist.by/api/v4/statistics/?contest_id={clist_id}&with_more_fields=true&place__isnull=false&order_by={order_by}&offset={offset}&limit=1000000{url_suffix}'
+    url = f'/api/v4/statistics/?contest_id={clist_id}&with_more_fields=true&place__isnull=false&order_by=place&limit=1000000{url_suffix}'
+    while url:
+      url = 'https://clist.by' + url
       json = await (await get(session, url)).json()
-      page = json['objects']
-      for entry in page:
-        standings[entry['handle']] = entry
-
-      if len(page) < json['meta']['limit']:
-        break
-      # clist.by's paging is broken because the source array, from which the
-      # page is taken, changes on every request when there are elements in it
-      # that are equivalent under the chosen order. So we could end up with
-      # duplicated or missing elements, if we were to naively request
-      # consecutive pages instead of doing this:
-      offset += next(i for i, entry in enumerate(page) if entry[order_by] == page[-1][order_by])
-      if page[0][order_by] == page[-1][order_by]:
-        raise Exception("Unable to guarantee result's completeness")
-
-    standings = sorted(standings.values(), key=lambda x: (x['place'], x['handle']))
+      standings += json['objects']
+      url = json['meta']['next']
 
   if all(entry['rating_change'] is None for entry in standings):
     raise Exception('Rating changes are not available yet')
