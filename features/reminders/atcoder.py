@@ -161,7 +161,7 @@ async def setup(_bot):
         datetime.fromisoformat(entry[0].text),
       )
 
-      if datetime.now().astimezone() < contest.time:
+      if datetime.now().astimezone() < contest.time - timedelta(seconds=parse_duration(config['atcoder_advance'])):
         reminders.append(asyncio.create_task(remind(contest)))
 
         logging.info(f'Adding AtCoder contest {contest.id} to watchlist')

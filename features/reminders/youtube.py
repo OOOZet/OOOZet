@@ -91,7 +91,7 @@ async def setup(bot):
 
     last_published = database.data['oki_last_published']
     for video in videos:
-      if video.time <= (datetime.now().astimezone() if video.is_livestream else last_published):
+      if video.time <= (datetime.now().astimezone() - timedelta(seconds=parse_duration(config['youtube_advance'])) if video.is_livestream else last_published):
         continue
 
       try:
