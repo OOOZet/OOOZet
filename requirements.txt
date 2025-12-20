@@ -3,3 +3,4 @@ requests
 defusedxml
 beautifulsoup4
 python-dateutil
+emoji

@@ -14,10 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging
+import aiohttp, asyncio, discord, emoji, logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
+from itertools import groupby
 
 import database
 from common import config, mention_datetime, parse_duration, sleep_until
@@ -35,6 +36,14 @@ async def setup(bot):
     def link(self):
       return f'https://www.youtube.com/watch?v={self.id}'
 
+    @property
+    def emojiless_title(self):
+      return ' '.join(
+        ''.join(token.value for token in group).strip()
+        for is_not_emoji, group in groupby(emoji.analyze(self.title, non_emoji=True), lambda token: isinstance(token.value, str))
+        if is_not_emoji
+      )
+
   async def remind(video):
     if video.is_livestream:
       time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
@@ -48,9 +57,9 @@ async def setup(bot):
     mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
     if video.is_livestream:
       relative_time = mention_datetime(video.time, relative=True)
-      announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{video.emojiless_title}]({video.link})! 🔔'
     else:
-      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.title}]({video.link})! 🔔'
+      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.emojiless_title}]({video.link})! 🔔'
     await bot.wait_until_ready()
     await bot.get_channel(config['oki_channel']).send(announcement, allowed_mentions=discord.AllowedMentions.all())
 
