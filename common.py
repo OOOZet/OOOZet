@@ -100,10 +100,9 @@ config = {
   'help_forum_contrib_cooldown': '1m',       # Odstęp czasu, po którym można ponownie dostać punkt udziału w rozwiązywaniu pytania
   'help_forum_eval_rate': '1d',              # Częstotliwość aktualizowania rankingu pomagaczy
 
-  'ping_race_role': None,                    # Rola pingowana w konkursie na najszybszy ping dnia
-  'ping_race_hour': 21,                      # Godzina, o której należy spingować tę rolę
-  'ping_race_minute': 37,                    # Minuta, o której należy spingować tę rolę
-  'ping_race_max_age_days': 90,              # Maksymalny wiek pingów branych pod uwagę w rankingu
+  'budzik_channel': None,                    # Kanał, na którym użytkownicy pingują poniższe role o odpowiednich godzinach
+  'budzik_roles': [],                        # Lista trójek [rola, godzina, minuta] dla ról, których pingowalność jest zarządzana przez bota
+  'budzik_max_age_days': 90,                 # Maksymalny wiek pingów pierwszej z powyższych ról branych pod uwagę w rankingu
 }
 
 def redacted_config():
