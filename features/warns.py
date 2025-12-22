@@ -23,7 +23,6 @@ import console, database
 from common import config, debacktick, format_datetime, limit_len, mention_date, mention_datetime, pages_view, select_view
 from features.utils import check_staff, is_staff
 
-# TODO: console command warn.transfer
 # TODO: update roles on expire
 
 bot = None
@@ -34,7 +33,7 @@ async def update_roles_for(member):
   roles = [discord.Object(i) for i in config['warn_roles']]
   do_expires(member.id)
   await member.remove_roles(*roles)
-  count = sum(not i['expired'] for i in database.data.get('warns', {}).get(member.id, []))
+  count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(member.id, []) + [member.id] for warn in database.data['warns'][account])
   if count > 0 and roles:
     await member.add_roles(roles[min(count, len(roles)) - 1])
 
@@ -44,7 +43,8 @@ async def update_roles():
     await update_roles_for(member)
 
 def do_expires(user): # Restarting this algorithm at any point during its execution is corruption-free, so we don't need to acquire database.lock.
-  warns = database.data.get('warns', {}).get(user)
+  warns = [warn for account in database.data.get('linked_users', {}).get(user, []) + [user] for warn in database.data.get('warns', {}).get(account, [])]
+  warns.sort(key=lambda x: x['time'])
   if not warns:
     return
 
@@ -98,7 +98,7 @@ async def setup(_bot):
       await update_roles_for(member)
 
     do_expires(user.id)
-    count = sum(not i['expired'] for i in database.data['warns'][user.id])
+    count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(user.id, []) + [user.id] for warn in database.data['warns'][account])
     await interaction.response.send_message(f'{user.mention} właśnie dostał swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
 
   @bot.tree.command(name='warn', description='Ostrzega użytkownika')
@@ -121,7 +121,7 @@ async def setup(_bot):
     await interaction.response.send_modal(modal)
 
   async def erase_warn(interaction, user):
-    if user == interaction.user and interaction.user != interaction.guild.owner:
+    if (user == interaction.user or user.id in database.data.get('linked_users', {}).get(interaction.user.id, [])) and interaction.user != interaction.guild.owner:
       await interaction.response.send_message('Nie możesz usuwać sobie ostrzeżeń. 😒', ephemeral=True)
       return
     elif all(i['expired'] for i in database.data.get('warns', {}).get(user.id, [])):
@@ -172,11 +172,14 @@ async def setup(_bot):
   async def warns(interaction, user):
     do_expires(user.id)
     active, expired = [], []
-    for warn in database.data.get('warns', {}).get(user.id, []):
-      if warn['expired']:
-        expired.append(warn)
-      else:
-        active.append(warn)
+    for account in database.data.get('linked_users', {}).get(user.id, []) + [user.id]:
+      for warn in database.data.get('warns', {}).get(account, []):
+        if warn['expired']:
+          expired.append((warn, account))
+        else:
+          active.append((warn, account))
+    active.sort(key=lambda x: x[0]['time'])
+    expired.sort(key=lambda x: x[0]['time'])
 
     pages = ['']
     def append(line):
@@ -190,18 +193,18 @@ async def setup(_bot):
         f'Do {user.mention} nie przyjdzie Mikołaj w tym roku… 😕\n',
         f'Na {user.mention} czeka już tylko czyściec… 😩\n',
       ]))
-      for warn in reversed(active):
+      for warn, account in reversed(active):
         reason = debacktick(warn['reason'])
         time = mention_datetime(warn['time'])
-        append(f'- `{reason}` w dniu {time}\n')
+        append(f'- `{reason}` w dniu {time}' + (f' na koncie <@{account}>' if account != user.id else '') + '\n')
 
     if expired and is_staff(interaction.user):
       append(f'Wygasłe ostrzeżenia użytkownika {user.mention}: 📜\n')
-      for warn in reversed(expired):
+      for warn, account in reversed(expired):
         reason = debacktick(warn['reason'])
         time = mention_datetime(warn['time'])
         expired = mention_date(warn['expired'])
-        append(f'- `{reason}` z dnia {time} wygasł {expired}.\n')
+        append(f'- `{reason}` z dnia {time} wygasłe {expired}' + (f' na koncie <@{account}>' if account != user.id else '') + '\n')
 
     if pages == ['']:
       await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych ostrzeżeń! 😇', ephemeral=True)
