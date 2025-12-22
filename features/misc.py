@@ -46,22 +46,16 @@ async def setup(_bot):
     else:
       raise
 
-  async def fix_roles(interaction, member):
+  @bot.tree.command(name='fix-roles', description='Naprawia role użytkownika')
+  @discord.app_commands.guilds(config['guild'])
+  async def fix_roles(interaction, member: discord.Member | None):
+    if member is None:
+      member = interaction.user
     logging.info(f'Received user request to update roles for {member.id}')
     await interaction.response.defer(ephemeral=True)
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
     await interaction.followup.send(f'Pomyślnie zaktualizowano role za warny i XP dla {member.mention}. 👌')
-
-  @bot.tree.command(name='fix-roles', description='Naprawia role użytkownika')
-  @discord.app_commands.guilds(config['guild'])
-  async def cmd_fix_roles(interaction, member: discord.Member | None):
-    await fix_roles(interaction, interaction.user if member is None else member)
-
-  @bot.tree.context_menu(name='Napraw role')
-  @discord.app_commands.guilds(config['guild'])
-  async def menu_fix_roles(interaction, member: discord.Member):
-    await fix_roles(interaction, member)
 
   @bot.listen()
   async def on_member_join(member):

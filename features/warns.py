@@ -18,6 +18,7 @@ import asyncio, discord, logging, random
 from dataclasses import dataclass
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from zoneinfo import ZoneInfo
 
 import console, database
 from common import config, debacktick, format_datetime, limit_len, mention_date, mention_datetime, pages_view, select_view
@@ -125,7 +126,7 @@ async def setup(_bot):
       await interaction.response.send_message('Nie możesz usuwać sobie ostrzeżeń. 😒', ephemeral=True)
       return
     elif all(i['expired'] for i in database.data.get('warns', {}).get(user.id, [])):
-      await interaction.response.send_message(f'{user.mention} nie ma żadnych niewygasłych ostrzeżeń, które możesz usunąć… 🤨', ephemeral=True)
+      await interaction.response.send_message(f'Na koncie {user.mention} nie ma żadnych niewygasłych ostrzeżeń, które możesz usunąć… 🤨', ephemeral=True)
       return
 
     async def callback(interaction2, choice):
@@ -144,7 +145,7 @@ async def setup(_bot):
       await interaction.edit_original_response(content=f'Pomyślnie usunięto ostrzeżenie `{reason}` z dnia {time} użytkownikowi {user.mention}. 🙄', view=None)
       await interaction2.response.defer()
 
-    await interaction.response.send_message(f'Które ostrzeżenie chcesz usunąć użytkownikowi {user.mention}?', view=select_view(
+    await interaction.response.send_message(f'Które ostrzeżenie chcesz usunąć z konta {user.mention}?', view=select_view(
       [
         discord.SelectOption(
           label=limit_len(warn['reason']),
@@ -168,6 +169,92 @@ async def setup(_bot):
   @check_staff('usuwania ostrzeżeń')
   async def menu_erase_warn(interaction, user: discord.User):
     await erase_warn(interaction, user)
+
+  async def edit_warn(interaction, user):
+    if (user == interaction.user or user.id in database.data.get('linked_users', {}).get(interaction.user.id, [])) and interaction.user != interaction.guild.owner:
+      await interaction.response.send_message('Nie możesz edytować sobie ostrzeżeń. 😒', ephemeral=True)
+      return
+    elif not database.data.get('warns', {}).get(user.id, []):
+      await interaction.response.send_message(f'Na koncie {user.mention} nie ma żadnych ostrzeżeń… 🤨', ephemeral=True)
+      return
+
+    async def show_modal(interaction2, choice):
+      warn = next(i for i in database.data['warns'][user.id] if id(i) == int(choice))
+
+      async def on_submit(interaction3):
+        try:
+          new_reason = reason_input.value
+          new_expired = datetime.fromisoformat(expired_input.value) if expired_input.value else None
+          if new_expired is not None:
+            if new_expired.tzinfo is None:
+              new_expired = new_expired.replace(tzinfo=ZoneInfo(config['timezone']))
+            assert new_expired.tzinfo.utcoffset(new_expired) is not None
+
+        except ValueError:
+          async def on_retry(interaction4):
+            reason_input.default = reason_input.value
+            expired_input.default = expired_input.value
+            nonlocal modal
+            modal = discord.ui.Modal(title=modal.title)
+            modal.on_submit = on_submit
+            modal.add_item(reason_input)
+            modal.add_item(expired_input)
+            await interaction3.delete_original_response()
+            await interaction4.response.send_modal(modal)
+
+          retry_button = discord.ui.Button(label='Spróbuj ponownie', style=discord.ButtonStyle.success)
+          retry_button.callback = on_retry
+          view = discord.ui.View()
+          view.add_item(retry_button)
+          await interaction3.response.send_message('Podany czas wygaśnięcia nie jest poprawnym czasem w formacie ISO 8601… 😕', view=view, ephemeral=True)
+
+        else:
+          old_reason = debacktick(warn['reason'])
+          old_expired = 'żadnego' if warn['expired'] is None else mention_datetime(warn['expired'])
+
+          logging.info(f'Edited warn for {user.id} from {warn["time"]}')
+          warn['reason'] = new_reason
+          warn['expired'] = new_expired
+          database.should_save = True
+
+          new_reason = debacktick(warn['reason'])
+          new_expired = 'żaden' if warn['expired'] is None else mention_datetime(warn['expired'])
+          time = mention_datetime(warn['time'])
+          await interaction.edit_original_response(content=f'Pomyślnie zmieniono powód z `{old_reason}` na `{new_reason}` i czas wygaśnięcia z {old_expired} na {new_expired} w ostrzeżeniu użytkownika {user.mention} z dnia {time}. 🫡', view=None)
+          await interaction3.response.defer()
+
+      reason_input = discord.ui.TextInput(label='Powód', default=warn['reason'])
+      expired_input = discord.ui.TextInput(required=False, label='Czas wygaśnięcia', default='' if warn['expired'] is None else warn['expired'].isoformat())
+      modal = discord.ui.Modal(title=f'Zedytuj ostrzeżenie')
+      modal.on_submit = on_submit
+      modal.add_item(reason_input)
+      modal.add_item(expired_input)
+      await interaction2.response.send_modal(modal)
+
+    await interaction.response.send_message(f'Które ostrzeżenie na koncie {user.mention} chcesz zedytować?', view=select_view(
+      [
+        discord.SelectOption(
+          label=limit_len(warn['reason']),
+          value=id(warn),
+          description=format_datetime(warn['time']),
+        )
+        for warn in reversed(database.data['warns'][user.id])
+      ],
+      show_modal,
+      interaction.user,
+    ))
+
+  @bot.tree.command(name='edit-warn', description='Edytuje ostrzeżenie')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff('edytowania ostrzeżeń')
+  async def cmd_edit_warn(interaction, user: discord.User):
+    await edit_warn(interaction, user)
+
+  @bot.tree.context_menu(name='Zedytuj ostrzeżenie')
+  @discord.app_commands.guilds(config['guild'])
+  @check_staff('edytowania ostrzeżeń')
+  async def menu_edit_warn(interaction, user: discord.User):
+    await edit_warn(interaction, user)
 
   async def warns(interaction, user):
     do_expires(user.id)
