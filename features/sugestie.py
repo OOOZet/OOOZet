@@ -460,7 +460,9 @@ async def setup(_bot):
   async def show(interaction):
     async def callback(interaction2, choice):
       sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
-      embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+      embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+      author = await bot.fetch_user(sugestia['author'])
+      embed.set_footer(text=author.our_name, icon_url=author.display_avatar.url)
       if sugestia['image'] is None:
         await interaction2.response.send_message(embed=embed, ephemeral=True)
       else:
@@ -487,7 +489,9 @@ async def setup(_bot):
   async def pending(interaction):
     async def callback(interaction2, choice):
       sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
-      embed = discord.Embed(title=mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+      embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+      author = await bot.fetch_user(sugestia['author'])
+      embed.set_footer(text=author.our_name, icon_url=author.display_avatar.url)
       if sugestia['image'] is None:
         await interaction2.response.send_message(embed=embed, ephemeral=True)
       else:
