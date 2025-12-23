@@ -125,13 +125,12 @@ async def setup(_bot):
     if (user == interaction.user or user.id in database.data.get('linked_users', {}).get(interaction.user.id, [])) and interaction.user != interaction.guild.owner:
       await interaction.response.send_message('Nie możesz usuwać sobie ostrzeżeń. 😒', ephemeral=True)
       return
-    elif all(i['expired'] for i in database.data.get('warns', {}).get(user.id, [])):
-      await interaction.response.send_message(f'Na koncie {user.mention} nie ma żadnych niewygasłych ostrzeżeń, które możesz usunąć… 🤨', ephemeral=True)
+    elif not database.data.get('warns', {}).get(user.id, []):
+      await interaction.response.send_message(f'Na koncie {user.mention} nie ma żadnych ostrzeżeń, które możesz usunąć… 🤨', ephemeral=True)
       return
 
     async def callback(interaction2, choice):
       warn = next(i for i in database.data['warns'][user.id] if id(i) == int(choice))
-      assert not warn['expired']
 
       logging.info(f'Erasing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
       database.data['warns'][user.id].remove(warn)
@@ -212,7 +211,7 @@ async def setup(_bot):
           old_reason = debacktick(warn['reason'])
           old_expired = 'żadnego' if warn['expired'] is None else mention_datetime(warn['expired'])
 
-          logging.info(f'Edited warn for {user.id} from {warn["time"]}')
+          logging.info(f'Edited warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
           warn['reason'] = new_reason
           warn['expired'] = new_expired
           database.should_save = True
@@ -311,6 +310,39 @@ async def setup(_bot):
   @bot.tree.context_menu(name='Pokaż ostrzeżenia')
   async def menu_warns(interaction, user: discord.User):
     await warns(interaction, user)
+
+  @bot.tree.command(name='warns-all', description='Pokazuje całą historię ostrzeżeń')
+  @check_staff('przeglądania historii ostrzeżeń')
+  async def warns_all(interaction):
+    do_expires_all()
+    all_warns = []
+    for account, warns in database.data.get('warns', {}).items():
+      all_warns += [(i, account) for i in warns]
+    all_warns.sort(key=lambda x: x[0]['time'])
+
+    pages = ['']
+    def append(line):
+      if len(pages[-1]) + len(line) > 2000:
+        pages.append('')
+      pages[-1] += line
+
+    append('Historia wszystkich ostrzeżeń na serwerze: 📜\n')
+    for warn, account in reversed(all_warns):
+      reason = debacktick(warn['reason'])
+      time = mention_datetime(warn['time'])
+      expired = '' if warn['expired'] is None else f' wygasłe {mention_date(warn["expired"])}'
+      append(f'- w dniu {time} dla <@{account}> za `{reason}` {expired}\n')
+
+    if pages == ['']:
+      await interaction.response.send_message(f'Wszyscy są grzeczni jak aniołki i nikt nie nazbierał jeszcze żadnych ostrzeżeń! 😇', ephemeral=True)
+      return
+
+    async def on_select_page(interaction2, page):
+      await interaction2.response.defer()
+      await interaction2.edit_original_response(content=pages[page], view=view)
+    view = pages_view(0, len(pages), on_select_page, interaction.user)
+
+    await interaction.response.send_message(pages[0], view=view, ephemeral=True)
 
 console.begin('warns')
 console.register('update_roles', None, 'updates warn roles for all members', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())

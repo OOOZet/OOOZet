@@ -231,37 +231,40 @@ async def setup(_bot):
     if user1 == user2:
       await interaction.response.send_message('Nie możesz połączyć tego samego konta z samym sobą… 😐', ephemeral=True)
       return
-    elif user1.id in database.data.get('linked_users', {}).get(user2.id, []):
-      await interaction.response.send_message(f'Konta {user1.mention} i {user2.mention} już są ze sobą połączone… 🤨', ephemeral=True)
-      return
 
     with database.lock:
-      logging.info(f'Linking users {user1.id} and {user2.id}')
-      clique1 = database.data.setdefault('linked_users', {}).setdefault(user1.id, []) + [user1.id]
-      clique2 = database.data['linked_users'].setdefault(user2.id, []) + [user2.id]
-      for i in clique1:
-        database.data['linked_users'][i] += clique2
-      for i in clique2:
-        database.data['linked_users'][i] += clique1
-      database.should_save = True
+      are_already_linked = user1.id in database.data.get('linked_users', {}).get(user2.id, [])
+      if not are_already_linked:
+        logging.info(f'Linking users {user1.id} and {user2.id}')
+        clique1 = database.data.setdefault('linked_users', {}).setdefault(user1.id, []) + [user1.id]
+        clique2 = database.data['linked_users'].setdefault(user2.id, []) + [user2.id]
+        for i in clique1:
+          database.data['linked_users'][i] += clique2
+        for i in clique2:
+          database.data['linked_users'][i] += clique1
+        database.should_save = True
 
-    await interaction.response.send_message(f'Pomyślnie połączono ze sobą konta {user1.mention} i {user2.mention}. 🫡', ephemeral=True)
+    if are_already_linked:
+      await interaction.response.send_message(f'Konta {user1.mention} i {user2.mention} już są ze sobą połączone… 🤨', ephemeral=True)
+    else:
+      await interaction.response.send_message(f'Pomyślnie połączono ze sobą konta {user1.mention} i {user2.mention}. 🫡', ephemeral=True)
 
   @bot.tree.command(description='Odłącza konto od wszystkich innych kont')
   @check_staff('odłączania kont')
   async def unlink(interaction, user: discord.User):
-    if not database.data.get('linked_users', {}).get(user.id, []):
-      await interaction.response.send_message(f'{user.mention} nie ma żadnych innych kont… 🤨', ephemeral=True)
-      return
-
     with database.lock:
-      logging.info(f'Unlinking user {user.id}')
-      for i in database.data['linked_users'][user.id]:
-        database.data['linked_users'][i].remove(user.id)
-      del database.data['linked_users'][user.id]
-      database.should_save = True
+      is_already_unlinked = not database.data.get('linked_users', {}).get(user.id, [])
+      if not is_already_unlinked:
+        logging.info(f'Unlinking user {user.id}')
+        for i in database.data['linked_users'][user.id]:
+          database.data['linked_users'][i].remove(user.id)
+        del database.data['linked_users'][user.id]
+        database.should_save = True
 
-    await interaction.response.send_message(f'Pomyślnie odłączono {user.mention} od wszystkich innych kont. 🫡', ephemeral=True)
+    if is_already_unlinked:
+      await interaction.response.send_message(f'{user.mention} nie ma żadnych innych kont… 🤨', ephemeral=True)
+    else:
+      await interaction.response.send_message(f'Pomyślnie odłączono {user.mention} od wszystkich innych kont. 🫡', ephemeral=True)
 
   @bot.tree.command(description='Wyświetla pozostałe konta użytkownika')
   async def linked(interaction, user: discord.User):

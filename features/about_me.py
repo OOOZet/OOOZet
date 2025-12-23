@@ -19,7 +19,7 @@ from datetime import datetime
 from io import StringIO
 from itertools import chain
 
-from common import config, HybridCheck, redacted_config
+from common import config, HybridCheck, pages_view, redacted_config
 
 async def setup(bot):
   @bot.tree.command(description='Wyświetla dostępne komendy bota')
@@ -39,23 +39,34 @@ async def setup(bot):
 
       return True
 
-    result = 'Lista dostępnych komend wpisywanych na kanale tekstowym: ⌨️\n'
+    pages = ['']
+    def append(line):
+      if len(pages[-1]) + len(line) > 2000:
+        pages.append('')
+      pages[-1] += line
+
+    append('Lista dostępnych komend wpisywanych na kanale tekstowym: ⌨️\n')
     cmds = sorted(filter(is_available, chain(
       bot.tree.walk_commands(),
       bot.tree.walk_commands(guild=discord.Object(config['guild'])),
     )), key=lambda x: x.qualified_name)
     for cmd in cmds:
-        result += '- `/' + ' '.join([cmd.qualified_name] + [f'<{i.name}>' if i.required else f'[{i.name}]' for i in cmd.parameters]) + f'` - {cmd.description}\n'
+        append('- `/' + ' '.join([cmd.qualified_name] + [f'<{i.name}>' if i.required else f'[{i.name}]' for i in cmd.parameters]) + f'` - {cmd.description}\n')
 
-    result += 'Komendy dostępne w zakładce "Aplikacje" po kliknięciu prawym przyciskiem myszy na użytkownika: 🖱️\n'
+    append('Komendy dostępne w zakładce "Aplikacje" po kliknięciu prawym przyciskiem myszy na użytkownika: 🖱️\n')
     cmds = sorted(filter(is_available, chain(
       bot.tree.walk_commands(type=discord.AppCommandType.user),
       bot.tree.walk_commands(type=discord.AppCommandType.user, guild=discord.Object(config['guild'])),
     )), key=lambda x: x.qualified_name)
     for cmd in cmds:
-      result += f'- {cmd.name}\n'
+      append(f'- {cmd.name}\n')
 
-    await interaction.response.send_message(result, ephemeral=True)
+    async def on_select_page(interaction2, page):
+      await interaction2.response.defer()
+      await interaction2.edit_original_response(content=pages[page], view=view)
+    view = pages_view(0, len(pages), on_select_page, interaction.user)
+
+    await interaction.response.send_message(pages[0], view=view, ephemeral=True)
 
   @bot.tree.command(name='config', description='Wyświetla konfigurację bota')
   async def config_(interaction):
