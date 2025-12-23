@@ -96,6 +96,7 @@ config = {
   'help_forum_ping_role': None,              # Rola, która jest pingowana w wezwaniach do pomocy na forum
   'help_forum_award_role': None,             # Rola dla najbardziej pomocnych pomagaczy
   'help_forum_award_count': 3,               # Liczba nagradzanych pomagaczy
+  'help_forum_award_channel': None,          # Kanał, na który są wysyłane ogłoszenia o przetasowaniach w topce pomagaczy
   'help_forum_eval_max_age': '1y',           # Maksymalny wiek postów branych pod uwagę w rankingu pomagaczy
   'help_forum_contrib_cooldown': '1m',       # Odstęp czasu, po którym można ponownie dostać punkt udziału w rozwiązywaniu pytania
   'help_forum_eval_rate': '1d',              # Częstotliwość aktualizowania rankingu pomagaczy

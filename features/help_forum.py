@@ -128,16 +128,21 @@ async def setup(_bot):
       await eval_post(post, True)
     database.should_save = True
 
-    for member in bot.get_guild(config['guild']).get_role(config['help_forum_award_role']).members:
-      await member.remove_roles(discord.Object(config['help_forum_award_role']))
-
-    awardedc = 0
+    awarded = set()
     for user, _ in get_ranking():
-      if awardedc >= config['help_forum_award_count']:
+      if len(awarded) >= config['help_forum_award_count']:
         break
       member = bot.get_guild(config['guild']).get_member(user)
       if member is not None:
-        await member.add_roles(discord.Object(config['help_forum_award_role']))
-        awardedc += 1
+        awarded.add(member)
+
+    for member in bot.get_guild(config['guild']).get_role(config['help_forum_award_role']).members:
+      if member not in awarded:
+        await member.remove_roles(discord.Object(config['help_forum_award_role']))
+    for member in awarded:
+      if member.get_role(config['help_forum_award_role']) is None and config['help_forum_award_channel'] is not None:
+        announcement = f'{member.mention} właśnie wszedł w top {config["help_forum_award_count"]} najbardziej pomocnych użytkowników! Dziękujemy! ❤️'
+        await bot.get_channel(config['help_forum_award_channel']).send(announcement, allowed_mentions=discord.AllowedMentions.all())
+      await member.add_roles(discord.Object(config['help_forum_award_role']))
 
   eval.start()

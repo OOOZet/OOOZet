@@ -127,10 +127,10 @@ async def setup(_bot):
         if msg.author.bot:
           continue
 
-        if match := re.match('https?://[^\s]+', msg.content):
+        if match := re.match(r'https?://[^\s]+', msg.content):
           url = match[0]
           description = msg.content.removeprefix(url).lstrip()
-        elif match := re.search('https?://[^\s]+$', msg.content):
+        elif match := re.search(r'https?://[^\s]+$', msg.content):
           url = match[0]
           description = msg.content.removesuffix(url).rstrip()
         else:
