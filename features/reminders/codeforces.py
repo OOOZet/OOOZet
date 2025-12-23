@@ -84,11 +84,12 @@ async def send_national_standings(contest):
   user_infos = {}
 
   handles = [member['handle'] for entry in standings['result']['rows'] for member in entry['party']['members']]
-  # Codeforces's documentation says we are allowed to write in as many as
-  # 10'000 users but it seems like their infrastructure fails anyway for any
-  # count of at least around 700 users.
-  for i in range(0, len(handles), 600):
-    batch = handles[i : i + 600]
+  # Codeforces's documentation says we are allowed to write in as many as 10'000
+  # users but it seems like they 400 Bad Request any request with a count of at
+  # least around 700 users anyways and even more worryingly some rare requests
+  # with ~600 users cause a 502 Bad Gateway error.
+  for i in range(0, len(handles), 500):
+    batch = handles[i : i + 500]
 
     async with aiohttp.ClientSession() as session:
       json = await (await session.get('https://codeforces.com/api/user.info?handles=' + ';'.join(batch))).json()
