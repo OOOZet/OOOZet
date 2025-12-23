@@ -51,13 +51,29 @@ async def send_national_standings(contest):
   if config['codeforces_channel'] is None:
     return
 
+  # Gentlemen, this is poor API design manifest!
+  should_be_rated = not contest.is_niche and 'Unrated' not in contest.title
+  # There is actually no proper way to check this… For unrated contests, the
+  # possible replies are a proper error (e.g. contest 2181) or an empty result
+  # (e.g. contest 2082). For rated contests that haven't finished yet it returns
+  # a proper error, for ones that did finish but have not been assigned rating
+  # changes yet it returns an empty result, and in other cases it returns
+  # a proper result, or an incomplete one if you're especially lucky.
+
   async with aiohttp.ClientSession() as session:
     json = await (await session.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}')).json()
   if json['status'] != 'OK':
-    if json['comment'] != 'contestId: Rating changes are unavailable for this contest':
+    if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
+      if should_be_rated:
+        logging.warn(f'Failed to detect an unrated contest: {contest}')
+        should_be_rated = False
+    else:
       raise Exception(f'Rating changes request failed: {json["comment"]!r}')
-  elif not json['result']:
+  elif not json['result'] and should_be_rated:
     raise Exception('Rating changes are not available yet')
+  elif json['result'] and not should_be_rated:
+    logging.warn(f'Failed to detect a rated contest: {contest}')
+    should_be_rated = True
   rating_changes = {i['handle']: i for i in json.get('result', [])}
 
   async with aiohttp.ClientSession() as session:
@@ -96,7 +112,10 @@ async def send_national_standings(contest):
       # contest.standings/contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
       for handle in map(lambda x: user_infos[x]['handle'], team)
     )
-    if len(team) == 1 and team[0] in rating_changes:
+    if team[0] in rating_changes or should_be_rated and entry['party']['participantType'] == 'CONTESTANT':
+      if team[0] not in rating_changes: # Codeforces sometimes sends an incomplete list of rating changes as mentioned before.
+        raise Exception(f'Rating changes are not available yet for: {team[0]!r}')
+      assert len(team) == 1
       old = rating_changes[team[0]]["oldRating"]
       new = rating_changes[team[0]]["newRating"]
       line += f' {old} → {new}'
