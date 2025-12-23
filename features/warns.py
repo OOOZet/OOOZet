@@ -34,7 +34,7 @@ async def update_roles_for(member):
   roles = [discord.Object(i) for i in config['warn_roles']]
   do_expires(member.id)
   await member.remove_roles(*roles)
-  count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(member.id, []) + [member.id] for warn in database.data['warns'][account])
+  count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(member.id, []) + [member.id] for warn in database.data.get('warns', {}).get(account, []))
   if count > 0 and roles:
     await member.add_roles(roles[min(count, len(roles)) - 1])
 
@@ -99,7 +99,7 @@ async def setup(_bot):
       await update_roles_for(member)
 
     do_expires(user.id)
-    count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(user.id, []) + [user.id] for warn in database.data['warns'][account])
+    count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(user.id, []) + [user.id] for warn in database.data['warns'].get(account, []))
     await interaction.response.send_message(f'{user.mention} właśnie dostał swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
 
   @bot.tree.command(name='warn', description='Ostrzega użytkownika')

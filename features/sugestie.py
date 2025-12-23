@@ -220,25 +220,28 @@ def view_for(sugestia):
         button.disabled = True
 
   async def on_describe(interaction):
+    url = mention_message(bot, sugestia['channel'], sugestia['id'])
+    result = f'## Sugestia {url}\n'
+
     if sugestia.get('annulled', {}).get('time', datetime.now().astimezone()) < sugestia['review_end']:
       review_end = mention_datetime(sugestia['review_end'])
       if 'annulled' in sugestia:
-        result = f'Opiniowanie miało skończyć się {review_end}. \n'
+        result += f'Opiniowanie miało skończyć się {review_end}. \n'
       else:
-        result = f'**Opiniowanie jeszcze trwa** i skończy się {review_end}. ❔\n'
+        result += f'**Opiniowanie jeszcze trwa** i skończy się {review_end}. ❔\n'
 
     else:
       vote_end = mention_datetime(sugestia['vote_end'])
       if 'outcome' in sugestia:
-        result = f'Głosowanie zakończyło się {vote_end} wynikiem '
+        result += f'Głosowanie zakończyło się {vote_end} wynikiem '
         if sugestia['outcome']:
           result += '**pozytywnym**. ✅\n'
         else:
           result += '**negatywnym**. ❌\n'
       elif 'annulled' in sugestia:
-        result = f'Głosowanie miało skończyć się {vote_end}.\n'
+        result += f'Głosowanie miało skończyć się {vote_end}.\n'
       else:
-        result = f'**Głosowanie jeszcze trwa** i skończy się {vote_end}. ❔\n'
+        result += f'**Głosowanie jeszcze trwa** i skończy się {vote_end}. ❔\n'
 
       if sugestia['for']:
         voters = ', '.join(f'<@{i}>' for i in sugestia['for'])
@@ -270,7 +273,8 @@ def view_for(sugestia):
       else:
         result += 'Sugestia **nie została jeszcze wykonana** przez administrację. ❓\n'
 
-    await interaction.response.send_message(result, ephemeral=True)
+    msg = await interaction.user.send(result)
+    await interaction.response.send_message(f'Więcej informacji o sugestii zostało przesłane Ci w [wiadomości prywatnej]({msg.jump_url}). 😊', ephemeral=True)
 
   describe_button = discord.ui.Button(custom_id='describe', label='Więcej informacji', style=discord.ButtonStyle.blurple)
   describe_button.callback = on_describe
