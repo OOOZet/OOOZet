@@ -21,7 +21,7 @@ from defusedxml import ElementTree
 from itertools import groupby
 
 import database
-from common import config, mention_datetime, parse_duration, sleep_until
+from common import config, log_exceptions, mention_datetime, parse_duration, sleep_until
 from features.reminders import websub
 
 async def setup(bot):
@@ -44,6 +44,7 @@ async def setup(bot):
         if is_not_emoji
       )
 
+  @log_exceptions
   async def remind(video):
     if video.is_livestream:
       time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))

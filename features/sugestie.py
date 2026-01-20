@@ -23,7 +23,7 @@ from io import BytesIO
 from mimetypes import guess_extension
 
 import console, database
-from common import config, debacktick, format_datetime, hybrid_check, limit_len, mention_datetime, mention_message, parse_duration, select_view, sleep_until
+from common import config, debacktick, format_datetime, hybrid_check, limit_len, log_exceptions, mention_datetime, mention_message, parse_duration, select_view, sleep_until
 from features.utils import check_staff, is_staff
 
 bot = None
@@ -314,6 +314,7 @@ async def update(sugestia):
       if config['sugestie_vote_ping_role'] is not None:
         await (await msg.channel.send(f'<@&{config["sugestie_vote_ping_role"]}>', allowed_mentions=discord.AllowedMentions.all())).delete()
 
+@log_exceptions
 async def time_updates(sugestia):
   time = sugestia['review_end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
   logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')

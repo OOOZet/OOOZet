@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import console, database
-from common import config, mention_datetime, parse_duration
+from common import config, log_exceptions, mention_datetime, parse_duration
 
 bot = None
 
@@ -43,7 +43,7 @@ class Contest:
 
   @property
   def is_niche(self):
-    return all(i not in self.title for i in ['Round', 'Hello', 'Good Bye'])
+    return all(i not in self.title for i in ['Round', 'Hello', 'Good Bye', 'Rated'])
 
 async def send_national_standings(contest):
   logging.info(f'Sending national standings for Codeforces contest {contest.id}')
@@ -151,6 +151,7 @@ async def setup(_bot):
   global bot
   bot = _bot
 
+  @log_exceptions
   async def remind(contest, delay):
     logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
     await asyncio.sleep(delay)

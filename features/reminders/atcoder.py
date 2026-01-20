@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import console, database
-from common import config, mention_datetime, parse_duration, sleep_until
+from common import config, log_exceptions, mention_datetime, parse_duration, sleep_until
 
 bot = None
 
@@ -120,6 +120,7 @@ async def setup(_bot):
   global bot
   bot = _bot
 
+  @log_exceptions
   async def remind(contest):
     time = contest.time - timedelta(seconds=parse_duration(config['atcoder_advance']))
     logging.info(f'Setting reminder for AtCoder contest {contest.id} for {time}')

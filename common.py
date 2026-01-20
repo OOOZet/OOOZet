@@ -17,6 +17,7 @@
 import asyncio, discord, json, logging
 from dataclasses import dataclass
 from datetime import datetime
+from functools import wraps
 from typing import Callable
 
 options = {
@@ -252,6 +253,7 @@ class HybridCheck:
 def hybrid_check(*, is_consistent=False):
   def decorator(pred):
     check = HybridCheck(pred, is_consistent)
+    @wraps(pred)
     def decorator_or_pred(arg=None):
       if arg is None or isinstance(arg, discord.Interaction):
         return check(arg)
@@ -268,3 +270,13 @@ def limit_len(string): # Used primarily for labels in select views
 async def sleep_until(time):
   while (now := datetime.now().astimezone()) < time:
     await asyncio.sleep(min((time - now).total_seconds(), 3 * 60))
+
+def log_exceptions(func):
+  @wraps(func)
+  async def inner(*args, **kwargs):
+    try:
+      await func(*args, **kwargs)
+    except:
+      logging.exception(f'Got exception in {func.__name__!r}')
+      raise
+  return inner
