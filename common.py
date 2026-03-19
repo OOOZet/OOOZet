@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2026 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -45,7 +45,7 @@ config = {
   'media_channels': [],                      # Kanały, na które można wysyłać tylko zdjęcia i filmy
 
   'warn_roles': [],                          # Role kosmetyczne wskazujące na liczbę warnów użytkownika
-  'warn_expire_interval': { 'months': 1 },   # Obiekt relativedelta określający odstęp czasu od ostatniej zmianie w liczbie warnów użytkownika, po którym wygasa najstarszy warn
+  'warn_expire_interval': { 'months': 3 },   # Obiekt relativedelta określający odstęp czasu od ostatniej zmianie w liczbie warnów użytkownika, po którym wygasa najstarszy warn
   'counting_channel': None,                  # Kanał "#liczenie"
   'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych
 
@@ -84,6 +84,7 @@ config = {
   'codeforces_role': None,                   # Rola, która jest pingowana w przypomnieniach o rundach
   'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
   'codeforces_poll_rate': '1h',              # Częstotliwość aktualizowania listy rund
+  'codeforces_api_lag': '1m',                # Maksymalny czas przetwarzania aktualizacji danych przez Codeforces
 
   'atcoder_channel': None,                   # Kanał, na który są wysyłane przypomnienia o kontestach na AtCoder
   'atcoder_role': None,                      # Rola, która jest pingowana w przypomnieniach o kontestach
@@ -276,6 +277,8 @@ def log_exceptions(func):
   async def inner(*args, **kwargs):
     try:
       await func(*args, **kwargs)
+    except asyncio.CancelledError:
+      raise
     except:
       logging.exception(f'Got exception in {func.__name__!r}')
       raise

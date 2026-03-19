@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2026 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -67,6 +67,9 @@ async def setup(bot):
   reminders = {}
 
   async def process_videos(ids):
+    ids = list(ids)
+    logging.info(f'Processing YouTube videos: {ids!r}')
+
     async with aiohttp.ClientSession() as session:
       response = await session.get(f'https://youtube.googleapis.com/youtube/v3/videos?key={config["youtube_api_key"]}&part=snippet,liveStreamingDetails' + ''.join(f'&id={i}' for i in ids))
       if not response.ok:

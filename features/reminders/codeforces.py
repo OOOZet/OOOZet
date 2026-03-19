@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2025 Karol "digitcrusher" Łacina
+# Copyright (C) 2023-2026 Karol "digitcrusher" Łacina
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -59,9 +59,24 @@ async def send_national_standings(contest):
   # a proper error, for ones that did finish but have not been assigned rating
   # changes yet it returns an empty result, and in other cases it returns
   # a proper result, or an incomplete one if you're especially lucky.
+  #
+  # In the past we used to detect the last case by checking, if all the
+  # participants that should have a rating change did, in fact, have one. And we
+  # could easily tell whether a contestant should have a rating change by
+  # comparing their participantType to 'CONTESTANT'. Unfortunately, at the
+  # beginning of 2026, Codeforces started marking some unrated-by-choice
+  # contestants, whom it had always labeled as OUT_OF_COMPETITION up to that
+  # point, as CONTESTANT. That's some real bollocks right there.
 
   async with aiohttp.ClientSession() as session:
-    json = await (await session.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}')).json()
+    prev_json = None
+    while True:
+      json = await (await session.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}')).json()
+      if json == prev_json:
+        break
+      prev_json = json
+      await asyncio.sleep(parse_duration(config['codeforces_api_lag']))
+
   if json['status'] != 'OK':
     if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
       if should_be_rated:
@@ -113,18 +128,18 @@ async def send_national_standings(contest):
       # contest.standings/contest.ratingChanges sometimes contains outdated handles. :rolling_eyes:
       for handle in map(lambda x: user_infos[x]['handle'], team)
     )
-    if team[0] in rating_changes or should_be_rated and entry['party']['participantType'] == 'CONTESTANT':
-      if team[0] not in rating_changes: # Codeforces sometimes sends an incomplete list of rating changes as mentioned before.
-        raise Exception(f'Rating changes are not available yet for: {team[0]!r}')
+    if team[0] in rating_changes:
       assert len(team) == 1
-      old = rating_changes[team[0]]["oldRating"]
-      new = rating_changes[team[0]]["newRating"]
+      old = rating_changes[team[0]]['oldRating']
+      new = rating_changes[team[0]]['newRating']
       line += f' {old} → {new}'
       delta = new - old
       if delta > 0:
         line += f' **({delta:+})**'
       else:
         line += f' ({delta:+})'
+    else:
+      assert all(i not in rating_changes for i in team)
     line += '\n'
     lines.append(line)
 
