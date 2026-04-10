@@ -118,11 +118,15 @@ async def setup(bot):
   try:
     logging.info("Downloading OKI's YouTube channel feed")
     async with aiohttp.ClientSession() as session:
-      response = await session.get(f'https://youtube.googleapis.com/youtube/v3/search?channelId={config["oki_youtube"]}&type=video&order=date&maxResults=50&key={config["youtube_api_key"]}')
-      if not response.ok:
-        logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
-        return
-      await process_videos(i['id']['videoId'] for i in (await response.json())['items'])
+      for url in [
+        f'https://youtube.googleapis.com/youtube/v3/search?channelId={config["oki_youtube"]}&type=video&order=date&maxResults=50&key={config["youtube_api_key"]}',
+        f'https://youtube.googleapis.com/youtube/v3/search?channelId={config["oki_youtube"]}&type=video&eventType=upcoming&order=date&maxResults=50&key={config["youtube_api_key"]}',
+      ]:
+        response = await session.get(url)
+        if not response.ok:
+          logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
+          continue
+        await process_videos(i['id']['videoId'] for i in (await response.json())['items'])
     logging.info("Processed OKI's YouTube channel feed")
   except Exception as e:
     logging.exception('Got exception while downloading YouTube channel feed')
