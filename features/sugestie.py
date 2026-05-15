@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, discord.ext.tasks, logging
+import asyncio, discord, logging
 from base64 import b64decode, b64encode
 from dataclasses import dataclass
 from datetime import datetime, timedelta

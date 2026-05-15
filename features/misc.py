@@ -18,7 +18,7 @@ import discord, logging, random
 from datetime import datetime
 
 import database
-from common import config, debacktick, hybrid_check, parse_duration
+from common import config, debacktick, hybrid_check, loop, parse_duration
 from features import warns, xp
 from features.utils import check_staff
 
@@ -125,7 +125,7 @@ async def setup(_bot):
         logging.info(f"{after.id}'s timeout has been manually removed")
         await after.remove_roles(role)
 
-  @discord.ext.tasks.loop(seconds=parse_duration(config['timeout_poll_rate']))
+  @loop(interval=config['timeout_poll_rate'])
   async def poll_timeouts():
     if config['timeout_role'] is not None:
       await bot.wait_until_ready()

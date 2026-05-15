@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import console, database
-from common import config, log_exceptions, mention_datetime, parse_duration
+from common import config, log_exceptions, loop, mention_datetime, parse_duration
 
 bot = None
 
@@ -185,7 +185,7 @@ async def setup(_bot):
   reminders = []
   watchlist = set()
 
-  @discord.ext.tasks.loop(seconds=parse_duration(config['codeforces_poll_rate']))
+  @loop(interval=config['codeforces_poll_rate'])
   async def poll():
     logging.info('Periodically downloading Codeforces contest list')
 

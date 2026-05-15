@@ -18,7 +18,7 @@ import asyncio, discord, logging
 from datetime import datetime, timedelta
 
 import database
-from common import config, hybrid_check, pages_view, parse_duration
+from common import config, hybrid_check, loop, pages_view, parse_duration
 
 bot = None
 
@@ -75,7 +75,7 @@ async def setup(_bot):
 
     await interaction.response.send_message(contents_of(0), view=view, ephemeral=True)
 
-  @discord.ext.tasks.loop(seconds=parse_duration(config['help_forum_eval_rate']))
+  @loop(interval=config['help_forum_eval_rate'])
   async def eval():
     await bot.wait_until_ready()
     if config['help_forum_channel'] is None:

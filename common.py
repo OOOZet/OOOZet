@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, json, logging
+import aiohttp, asyncio, discord, json, logging, time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from typing import Callable
 
@@ -283,3 +283,61 @@ def log_exceptions(func):
       logging.exception(f'Got exception in {func.__name__!r}')
       raise
   return inner
+
+def loop(*args, **kwargs):
+  def decorator(func):
+    return Loop(func, *args, **kwargs)
+  return decorator
+
+class Loop:
+  def __init__(self, func, *, interval=None, time=None, retries=['5s', '15s', '30s', '1m']):
+    self.func = func
+    self.interval = interval
+    self.time = time
+    self.retries = retries
+    self.transient_exceptions = (
+      aiohttp.ClientConnectionError,
+      ConnectionError,
+      discord.ConnectionClosed,
+      discord.DiscordServerError,
+      discord.GatewayNotFound,
+      TimeoutError,
+    )
+    self.is_retrying = False
+
+  def start(self):
+    asyncio.create_task(log_exceptions(self.run)())
+
+  async def run(self):
+    start = time.monotonic()
+    while True:
+      assert (self.interval is None) != (self.time is None)
+      if self.time is not None:
+        now = datetime.now(self.time.tzinfo)
+        start = datetime.combine(now.date(), self.time)
+        if start < now:
+          start += timedelta(days=1)
+        await sleep_until(start)
+
+      self.is_retrying = False
+      i = 0
+      while True:
+        try:
+          await self.func()
+        except self.transient_exceptions:
+          if i >= len(self.retries):
+            logging.exception(f'Got transient exception in loop {self.func.__name__!r}')
+            break
+          delay = parse_duration(self.retries[i])
+          i += 1
+          logging.exception(f'Got transient exception in loop {self.func.__name__!r}. Retrying in {delay} seconds')
+          await asyncio.sleep(delay)
+          self.is_retrying = True
+          continue
+        except:
+          logging.exception(f'Got exception in loop {self.func.__name__!r}')
+        break
+
+      if self.interval is not None:
+        start += parse_duration(self.interval)
+        await asyncio.sleep(start - time.monotonic())

@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import console, database
-from common import config, hybrid_check, pages_view
+from common import config, hybrid_check, loop, pages_view
 
 bot = None
 lock = asyncio.Lock()
@@ -110,10 +110,10 @@ async def setup(_bot):
     should_be_mentionable = None
 
     logging.info(f'Scheduling the setting of role {role} to be mentionable for {hour}:{minute - 1:02}')
-    @discord.ext.tasks.loop(time=dt.time(hour, minute - 1, tzinfo=ZoneInfo(config['timezone'])))
+    @loop(time=dt.time(hour, minute - 1, tzinfo=ZoneInfo(config['timezone'])))
     async def enable():
       async with lock:
-        if not enable.failed():
+        if not enable.is_retrying:
           nonlocal should_be_mentionable
           should_be_mentionable = True
         if not should_be_mentionable:
@@ -124,10 +124,10 @@ async def setup(_bot):
     enable.start()
 
     logging.info(f'Scheduling the setting of role {role} to not be mentionable for {hour}:{minute + 1:02}')
-    @discord.ext.tasks.loop(time=dt.time(hour, minute + 1, tzinfo=ZoneInfo(config['timezone'])))
+    @loop(time=dt.time(hour, minute + 1, tzinfo=ZoneInfo(config['timezone'])))
     async def disable():
       async with lock:
-        if not disable.failed():
+        if not disable.is_retrying:
           nonlocal should_be_mentionable
           should_be_mentionable = False
         if should_be_mentionable:

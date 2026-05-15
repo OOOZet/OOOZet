@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import console, database
-from common import config, log_exceptions, mention_datetime, parse_duration, sleep_until
+from common import config, log_exceptions, loop, mention_datetime, parse_duration, sleep_until
 
 bot = None
 
@@ -140,7 +140,7 @@ async def setup(_bot):
   reminders = []
   watchlist = set()
 
-  @discord.ext.tasks.loop(seconds=parse_duration(config['atcoder_poll_rate']))
+  @loop(interval=config['atcoder_poll_rate'])
   async def poll():
     logging.info('Periodically downloading AtCoder contest schedule')
 
