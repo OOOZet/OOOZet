@@ -77,6 +77,14 @@ async def setup(bot):
         return
       json = await response.json()
 
+    for i in ids:
+      try:
+        if reminders[i].cancel():
+          logging.info(f'Unset reminder for YouTube livestream {i}')
+        del reminders[i]
+      except KeyError:
+        pass
+
     videos = []
     for entry in json['items']:
       video = Video(entry['id'], entry['snippet']['title'], datetime.fromisoformat(entry['snippet']['publishedAt']), False)
@@ -98,10 +106,6 @@ async def setup(bot):
       if video.time <= (datetime.now().astimezone() + timedelta(seconds=parse_duration(config['youtube_advance'])) if video.is_livestream else last_published):
         continue
 
-      try:
-        reminders[video.id].cancel()
-      except KeyError:
-        pass
       reminders[video.id] = asyncio.create_task(remind(video))
 
       if not video.is_livestream:
