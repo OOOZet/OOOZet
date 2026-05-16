@@ -77,43 +77,50 @@ async def send_national_standings(contest):
       prev_json = json
       await asyncio.sleep(parse_duration(config['codeforces_api_lag']))
 
-  if json['status'] != 'OK':
-    if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
-      if should_be_rated:
-        logging.warn(f'Failed to detect an unrated contest: {contest}')
-        should_be_rated = False
-    else:
-      raise Exception(f'Rating changes request failed: {json["comment"]!r}')
-  elif not json['result'] and should_be_rated:
-    raise Exception('Rating changes are not available yet')
-  elif json['result'] and not should_be_rated:
-    logging.warn(f'Failed to detect a rated contest: {contest}')
-    should_be_rated = True
-  rating_changes = {i['handle']: i for i in json.get('result', [])}
-
-  async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
-    standings = await (await session.get('contest.standings', params={'contestId': contest.id})).json()
-  if standings['status'] != 'OK':
-    raise Exception(f'Standings request failed: {standings["comment"]!r}')
-  standings = [i for i in standings['result']['rows'] if i['party']['participantType'] in {'CONTESTANT', 'OUT_OF_COMPETITION'}]
-
-  user_infos = {}
-
-  handles = [member['handle'] for entry in standings for member in entry['party']['members']]
-  # Codeforces's documentation says we are allowed to write in as many as 10'000
-  # users but it seems like they 400 Bad Request any request with a count of at
-  # least around 700 users anyways and even more worryingly some rare requests
-  # with ~600 users cause a 502 Bad Gateway error.
-  for i in range(0, len(handles), 500):
-    batch = handles[i : i + 500]
-
-    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
-      json = await (await session.get('user.info', params={'handles': ';'.join(batch)})).json()
     if json['status'] != 'OK':
-      raise Exception(f'User info request failed: {json["comment"]!r}')
+      if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
+        if should_be_rated:
+          logging.warn(f'Failed to detect an unrated contest: {contest}')
+          should_be_rated = False
+      else:
+        raise Exception(f'Rating changes request failed: {json["comment"]!r}')
+    elif not json['result'] and should_be_rated:
+      raise Exception('Rating changes are not available yet')
+    elif json['result'] and not should_be_rated:
+      logging.warn(f'Failed to detect a rated contest: {contest}')
+      should_be_rated = True
+    rating_changes = {i['handle']: i for i in json.get('result', [])}
 
-    assert len(batch) == len(json['result'])
-    user_infos.update(zip(batch, json['result']))
+    standings = await (await session.get('contest.standings', params={'contestId': contest.id})).json()
+    if standings['status'] != 'OK':
+      raise Exception(f'Standings request failed: {standings["comment"]!r}')
+    standings = [i for i in standings['result']['rows'] if i['party']['participantType'] in {'CONTESTANT', 'OUT_OF_COMPETITION'}]
+
+    user_infos = {}
+
+    old_user_handles = database.data.get('codeforces_handles', {}).copy()
+    handles = [member['handle'] for entry in standings for member in entry['party']['members']] + list(old_user_handles.values())
+    # Codeforces's documentation says we are allowed to write in as many as 10'000
+    # users but it seems like they 400 Bad Request any request with a count of at
+    # least around 700 users anyways and even more worryingly some rare requests
+    # with ~600 users cause a 502 Bad Gateway error.
+    for i in range(0, len(handles), 500):
+      batch = handles[i : i + 500]
+
+      json = await (await session.get('user.info', params={'handles': ';'.join(batch)})).json()
+      if json['status'] != 'OK':
+        raise Exception(f'User info request failed: {json["comment"]!r}')
+
+      assert len(batch) == len(json['result'])
+      user_infos.update(zip(batch, json['result']))
+
+    for user, old_handle in old_user_handles.items():
+      new_handle = user_infos[old_handle]['handle']
+      if new_handle == old_handle or database.data['codeforces_handles'].get(user) != old_handle:
+        continue
+      logging.info(f"Updating {user}'s Codeforces handle from {old_handle!r} to {new_handle!r}")
+      database.data['codeforces_handles'][user] = new_handle
+      database.should_save = True
 
   lines = []
 
@@ -249,8 +256,10 @@ async def setup(_bot):
       json = await (await session.get('user.info', params={'handles': handle, 'checkHistoricHandles': 'false'})).json()
     if json['status'] != 'OK':
       raise Exception(f'Codeforces user info verification request failed: {json["comment"]!r}')
-    first = json['result'][0].get('firstName')
-    last = json['result'][0].get('lastName')
+    user_info = json['result'][0]
+    handle = user_info['handle']
+    first = user_info.get('firstName')
+    last = user_info.get('lastName')
 
     x = ''.join((first or '').split())
     y = ''.join((last or '').split())
