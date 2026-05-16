@@ -154,7 +154,7 @@ async def setup(_bot):
           title = url
 
         embed = discord.Embed(title=title, url=url, description=description)
-        embed.set_footer(text=msg.author.our_name, icon_url=msg.author.display_avatar.url)
+        embed.set_footer(text=msg.author, icon_url=msg.author.display_avatar.url)
         my_msg = await msg.channel.send(embed=embed)
         await my_msg.add_reaction('❤️')
         await my_msg.add_reaction('👍')
@@ -183,7 +183,7 @@ async def setup(_bot):
     if msg.author != bot.user or not msg.embeds:
       return
 
-    is_author = msg.embeds[0].footer.text == bot.get_user(payload.user_id).our_name # Watch out for identity theft!
+    is_author = msg.embeds[0].footer.text == str(bot.get_user(payload.user_id)) # Watch out for identity theft!
     if payload.emoji.name == '❌' and is_author:
       await msg.delete()
     elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me) or is_author:

@@ -70,8 +70,8 @@ async def setup(bot):
     ids = list(ids)
     logging.info(f'Processing YouTube videos: {ids!r}')
 
-    async with aiohttp.ClientSession() as session:
-      response = await session.get(f'https://youtube.googleapis.com/youtube/v3/videos?key={config["youtube_api_key"]}&part=snippet,liveStreamingDetails' + ''.join(f'&id={i}' for i in ids))
+    async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
+      response = await session.get('videos', params={'key': config['youtube_api_key'], 'part': 'snippet,liveStreamingDetails', 'id': ids})
       if not response.ok:
         logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
         return
@@ -117,12 +117,12 @@ async def setup(bot):
 
   try:
     logging.info("Downloading OKI's YouTube channel feed")
-    async with aiohttp.ClientSession() as session:
-      for url in [
-        f'https://youtube.googleapis.com/youtube/v3/search?channelId={config["oki_youtube"]}&type=video&order=date&maxResults=50&key={config["youtube_api_key"]}',
-        f'https://youtube.googleapis.com/youtube/v3/search?channelId={config["oki_youtube"]}&type=video&eventType=upcoming&order=date&maxResults=50&key={config["youtube_api_key"]}',
+    async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
+      for params in [
+        {'type': 'video', 'order': 'date', 'maxResults': 50},
+        {'type': 'video', 'eventType': 'upcoming', 'order': 'date', 'maxResults': 50},
       ]:
-        response = await session.get(url)
+        response = await session.get('search', params=params | {'channelId': config['oki_youtube'], 'key': config['youtube_api_key']})
         if not response.ok:
           logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
           continue

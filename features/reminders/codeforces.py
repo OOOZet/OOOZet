@@ -68,10 +68,10 @@ async def send_national_standings(contest):
   # contestants, whom it had always labeled as OUT_OF_COMPETITION up to that
   # point, as CONTESTANT. That's some real bollocks right there.
 
-  async with aiohttp.ClientSession() as session:
+  async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
     prev_json = None
     while True:
-      json = await (await session.get(f'https://codeforces.com/api/contest.ratingChanges?contestId={contest.id}')).json()
+      json = await (await session.get('contest.ratingChanges', params={'contestId': contest.id})).json()
       if json == prev_json:
         break
       prev_json = json
@@ -91,14 +91,15 @@ async def send_national_standings(contest):
     should_be_rated = True
   rating_changes = {i['handle']: i for i in json.get('result', [])}
 
-  async with aiohttp.ClientSession() as session:
-    standings = await (await session.get(f'https://codeforces.com/api/contest.standings?contestId={contest.id}&participantTypes=CONTESTANT,OUT_OF_COMPETITION')).json()
+  async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+    standings = await (await session.get('contest.standings', params={'contestId': contest.id})).json()
   if standings['status'] != 'OK':
     raise Exception(f'Standings request failed: {standings["comment"]!r}')
+  standings = [i for i in standings['result']['rows'] if i['party']['participantType'] in {'CONTESTANT', 'OUT_OF_COMPETITION'}]
 
   user_infos = {}
 
-  handles = [member['handle'] for entry in standings['result']['rows'] for member in entry['party']['members']]
+  handles = [member['handle'] for entry in standings for member in entry['party']['members']]
   # Codeforces's documentation says we are allowed to write in as many as 10'000
   # users but it seems like they 400 Bad Request any request with a count of at
   # least around 700 users anyways and even more worryingly some rare requests
@@ -106,8 +107,8 @@ async def send_national_standings(contest):
   for i in range(0, len(handles), 500):
     batch = handles[i : i + 500]
 
-    async with aiohttp.ClientSession() as session:
-      json = await (await session.get('https://codeforces.com/api/user.info?handles=' + ';'.join(batch))).json()
+    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+      json = await (await session.get('user.info', params={'handles': ';'.join(batch)})).json()
     if json['status'] != 'OK':
       raise Exception(f'User info request failed: {json["comment"]!r}')
 
@@ -117,7 +118,7 @@ async def send_national_standings(contest):
   lines = []
 
   reverse_handles = {v: k for k, v in database.data.get('codeforces_handles', {}).items()}
-  for entry in standings['result']['rows']:
+  for entry in standings:
     team = [member['handle'] for member in entry['party']['members']]
 
     if not all(user_infos[i].get('country') == 'Poland' for i in team):
@@ -189,8 +190,8 @@ async def setup(_bot):
   async def poll():
     logging.info('Periodically downloading Codeforces contest list')
 
-    async with aiohttp.ClientSession() as session:
-      json = await (await session.get('https://codeforces.com/api/contest.list')).json()
+    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+      json = await (await session.get('contest.list')).json()
     if json['status'] != 'OK':
       logging.error(f'Codeforces contest list request failed: {json["comment"]!r}')
       return
@@ -231,8 +232,8 @@ async def setup(_bot):
       await interaction.response.send_message('Taki nick zawiera niedozwolone znaki… 🤨', ephemeral=True)
       return
 
-    async with aiohttp.ClientSession() as session:
-      json = await (await session.get(f'https://codeforces.com/api/user.info?handles={handle}&checkHistoricHandles=false')).json()
+    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+      json = await (await session.get('user.info', params={'handles': handle, 'checkHistoricHandles': 'false'})).json()
     if 'not found' in json.get('comment', ''):
       await interaction.response.send_message('Nie ma na Codeforces konta o takim nicku… 🤨', ephemeral=True)
       return
@@ -244,8 +245,8 @@ async def setup(_bot):
     await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True)
     await asyncio.sleep(3 * 60)
 
-    async with aiohttp.ClientSession() as session:
-      json = await (await session.get(f'https://codeforces.com/api/user.info?handles={handle}&checkHistoricHandles=false')).json()
+    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+      json = await (await session.get('user.info', params={'handles': handle, 'checkHistoricHandles': 'false'})).json()
     if json['status'] != 'OK':
       raise Exception(f'Codeforces user info verification request failed: {json["comment"]!r}')
     first = json['result'][0].get('firstName')
@@ -304,8 +305,8 @@ async def setup(_bot):
       await interaction.response.send_message('Pomyślnie zapomniano twój nick na Codeforces. 🫡', ephemeral=True)
 
 async def send_standings(contest_id):
-  async with aiohttp.ClientSession() as session:
-    json = await (await session.get(f'https://codeforces.com/api/contest.standings?contestId={contest_id}&count=1')).json()
+  async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+    json = await (await session.get('contest.standings', params={'contestId': contest_id})).json()
   if json['status'] != 'OK':
     raise Exception(f'Codeforces contest standings request failed: {json["comment"]!r}')
   await send_national_standings(Contest.from_json(json['result']['contest']))

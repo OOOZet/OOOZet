@@ -118,7 +118,10 @@ def listen():
         line = line.decode()
       except Exception as e:
         logging.exception('Got exception while decoding console command')
-        client.send(''.join(traceback.format_exception(None, e, e.__traceback__)).encode())
+        try:
+          client.send(''.join(traceback.format_exception(None, e, e.__traceback__)).encode())
+        except BrokenPipeError: # The client sent junk and ran away.
+          pass
         continue
 
       logging.info(f'Console received command {line!r}')

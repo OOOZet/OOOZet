@@ -1,6 +1,7 @@
-discord.py ~= 2.0
-requests
-defusedxml
+aiohttp ~= 3.12
 beautifulsoup4
+defusedxml
+discord.py ~= 2.3
+emoji ~= 2.5
 python-dateutil
-emoji
+requests

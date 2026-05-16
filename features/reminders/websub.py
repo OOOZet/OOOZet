@@ -94,7 +94,7 @@ class Server(http.server.HTTPServer):
             'hub.lease_seconds': ceil(parse_duration(config['websub_lease_time'])),
             'hub.secret': self.secret,
           }, timeout=timeout)
-        except requests.exceptions.Timeout:
+        except requests.Timeout:
           logging.error(f'WebSub {noun} request timed out after {timeout} seconds' + retrying)
         except:
           logging.exception(f'Got exception while {gerund} WebSub server' + retrying)

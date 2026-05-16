@@ -38,11 +38,10 @@ class Contest:
   def is_niche(self):
     return all(i not in self.title for i in ['Beginner', 'Regular', 'Grand'])
 
-async def get(session, url):
+async def rate_limit_middleware(request, handler):
   while True:
-    response = await session.get(url)
+    response = await handler(request)
     if response.status != 429:
-      response.raise_for_status()
       return response
     seconds = int(response.headers['Retry-After'])
     logging.info(f'Rate limited by {response.url.host}. Retrying in {seconds} seconds')
@@ -56,20 +55,21 @@ async def send_national_standings(contest):
 
   standings = []
 
-  async with aiohttp.ClientSession() as session:
-    url_suffix = f'&format=json&api_key={config["clist_api_key"]}&username={config["clist_username"]}'
+  async with aiohttp.ClientSession('https://clist.by/api/v4/', middlewares=[rate_limit_middleware]) as session:
+    params = {'format': 'json', 'api_key': config['clist_api_key'], 'username': config['clist_username']}
 
-    json = await (await get(session, f'https://clist.by/api/v4/contest/?resource_id=93&event={contest.title}{url_suffix}')).json()
+    json = await (await session.get('contest', params={'resource_id': 93, 'event': contest.title} | params)).json()
     if len(json['objects']) != 1:
       raise Exception(f'No unique contest in {json!r}')
     clist_id = json['objects'][0]['id']
 
-    url = f'/api/v4/statistics/?contest_id={clist_id}&with_more_fields=true&place__isnull=false&order_by=place&limit=1000000{url_suffix}'
+    url = 'statistics'
+    params |= {'contest_id': clist_id, 'with_more_fields': 'true', 'place__isnull': 'false', 'order_by': 'place', 'limit': 1000000}
     while url:
-      url = 'https://clist.by' + url
-      json = await (await get(session, url)).json()
+      json = await (await session.get(url, params=params, raise_for_status=True)).json()
       standings += json['objects']
       url = json['meta']['next']
+      params.clear()
 
   if all(entry['rating_change'] is None for entry in standings):
     raise Exception('Rating changes are not available yet')

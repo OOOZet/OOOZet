@@ -76,10 +76,10 @@ async def setup(_bot):
     logging.info(f'{member.id} left the guild')
     if member.guild.system_channel_flags.join_notifications:
       announcement = random.choice([
-        f'Niestety nie ma już `{member.our_name}` z nami… 🕯️',
-        f'Chwila ciszy dla `{member.our_name}`… 🕯️',
-        f'`{member.our_name}` już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
-        f'`{member.our_name}` wyszedł z serwera… 🕯️',
+        f'Niestety nie ma już `{member}` z nami… 🕯️',
+        f'Chwila ciszy dla `{member}`… 🕯️',
+        f'`{member}` już nie mógł wytrzymać tego syfu i wyszedł… 🕯️',
+        f'`{member}` wyszedł z serwera… 🕯️',
       ])
       await member.guild.system_channel.send(announcement)
 
@@ -150,7 +150,7 @@ async def setup(_bot):
       await interaction.response.send_message(f'Nie jesteś wyżej w hierarchii od {member.mention}… 🤨', ephemeral=True)
     else:
       try:
-        await member.kick(reason=f'Na żądanie {interaction.user.our_name}')
+        await member.kick(reason=f'Na żądanie {interaction.user}')
       except discord.Forbidden:
         await interaction.response.send_message(f'Nie mam uprawnień, żeby skickować {member.mention}… 🧐', ephemeral=True)
       else:
@@ -176,7 +176,7 @@ async def setup(_bot):
       await interaction.response.send_message(f'Nie jesteś wyżej w hierarchii od {user.mention}… 🤨', ephemeral=True)
     else:
       try:
-        await interaction.guild.ban(user, reason=f'{reason} — {interaction.user.our_name}', delete_message_seconds=0)
+        await interaction.guild.ban(user, reason=f'{reason} — {interaction.user}', delete_message_seconds=0)
       except discord.Forbidden:
         await interaction.response.send_message(f'Nie mam uprawnień, żeby zbanować {user.mention}… 🧐', ephemeral=True)
       else:
@@ -198,14 +198,14 @@ async def setup(_bot):
       await ban(interaction2, user, text_input.value)
 
     text_input = discord.ui.TextInput(label='Powód')
-    modal = discord.ui.Modal(title=f'Zbanuj {user.our_name}')
+    modal = discord.ui.Modal(title=f'Zbanuj {user}')
     modal.on_submit = on_submit
     modal.add_item(text_input)
     await interaction.response.send_modal(modal)
 
   async def unban(interaction, user):
     try:
-      await interaction.guild.unban(user, reason=f'Na żądanie {interaction.user.our_name}')
+      await interaction.guild.unban(user, reason=f'Na żądanie {interaction.user}')
       logging.info(f'{interaction.user.id} unbanned {user.id}')
     except discord.NotFound:
       await interaction.response.send_message(f'{user.mention} nie jest obecnie zbanowany… 🤨', ephemeral=True)

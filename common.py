@@ -263,8 +263,6 @@ def hybrid_check(*, is_consistent=False):
     return decorator_or_pred
   return decorator
 
-discord.User.our_name = discord.Member.our_name = property(lambda self: self.name + ('#' + self.discriminator if self.discriminator != '0' else ''))
-
 def limit_len(string): # Used primarily for labels in select views
   return string if len(string) <= 100 else string[:99] + '…'
 
