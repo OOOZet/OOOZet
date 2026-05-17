@@ -205,8 +205,10 @@ async def setup(_bot):
 
     async with aiohttp.ClientSession(raise_for_status=True) as session:
       text = await (await session.get(f'https://atcoder.jp/users/{handle}')).text()
+    html = BeautifulSoup(text, 'lxml')
+    handle = html.find(class_='username').text.strip()
     try:
-      read = next(i.td.text for i in BeautifulSoup(text, 'lxml').find_all('tr') if i.th.text == 'Affiliation')
+      read = next(i.td.text for i in html.find_all('tr') if i.th.text == 'Affiliation')
     except StopIteration:
       read = None
 
