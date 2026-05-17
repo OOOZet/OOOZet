@@ -44,7 +44,7 @@ async def find_problem(url):
        (match := re.fullmatch('/problemset/problem/([0-9]+)/([A-Za-z0-9]+)', path)):
       contest = int(match[1])
       letter = match[2].upper()
-      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}&count=1')
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}')
       return (
         'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}/problem/{letter}',
         next(i['name'] for i in json['result']['problems'] if i['index'] == letter),
@@ -52,7 +52,7 @@ async def find_problem(url):
 
     elif match := re.match('/(?:contest|gym)/([0-9]+)', path):
       contest = int(match[1])
-      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}&count=1')
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}')
       return (
         'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}',
         json['result']['contest']['name'],
@@ -154,7 +154,7 @@ async def setup(_bot):
           title = url
 
         embed = discord.Embed(title=title, url=url, description=description)
-        embed.set_footer(text=msg.author, icon_url=msg.author.display_avatar.url)
+        embed.set_footer(text=str(msg.author), icon_url=msg.author.display_avatar.url)
         my_msg = await msg.channel.send(embed=embed)
         await my_msg.add_reaction('❤️')
         await my_msg.add_reaction('👍')

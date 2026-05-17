@@ -354,7 +354,7 @@ async def clean():
         continue
 
       embed = discord.Embed(title='Sugestia', description=msg.content)
-      embed.set_footer(text=msg.author, icon_url=msg.author.display_avatar.url)
+      embed.set_footer(text=str(msg.author), icon_url=msg.author.display_avatar.url)
       if image is None:
         my_msg = await msg.channel.send(embed=embed)
       else:
@@ -463,7 +463,7 @@ async def setup(_bot):
       sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
       embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
       author = await bot.fetch_user(sugestia['author'])
-      embed.set_footer(text=author, icon_url=author.display_avatar.url)
+      embed.set_footer(text=str(author), icon_url=author.display_avatar.url)
       if sugestia['image'] is None:
         await interaction2.response.send_message(embed=embed, ephemeral=True)
       else:
@@ -492,7 +492,7 @@ async def setup(_bot):
       sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
       embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
       author = await bot.fetch_user(sugestia['author'])
-      embed.set_footer(text=author, icon_url=author.display_avatar.url)
+      embed.set_footer(text=str(author), icon_url=author.display_avatar.url)
       if sugestia['image'] is None:
         await interaction2.response.send_message(embed=embed, ephemeral=True)
       else:
