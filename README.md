@@ -11,7 +11,7 @@ Bot serwera [OKI OI OIJ Zjednoczenie](https://discord.gg/AMGxG4TvDS) do spełnia
 5. Odpal `./main.py` lub `./main.py -c <path to config>`.
 6. Smacznego.
 
-Domyślnie bot będzie zapisywał swoje dane w `database.json`, a jego konsola będzie otwarta na porcie 4123, do której możesz się podłączyć za pomocą `telnet localhost 4123`.
+Domyślnie bot będzie zapisywał swoje dane w `database.json`, a jego konsola będzie otwarta na porcie 2341, do której możesz się podłączyć za pomocą `telnet localhost 2341`.
 
 ## Kontrybuowanie
 

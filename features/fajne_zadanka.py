@@ -177,7 +177,7 @@ async def setup(_bot):
 
   @bot.listen()
   async def on_raw_reaction_add(payload):
-    if payload.channel_id != config['fajne_zadanka_channel']:
+    if payload.channel_id != config['fajne_zadanka_channel'] or payload.member == bot.user:
       return
     msg = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
     if msg.author != bot.user or not msg.embeds:
