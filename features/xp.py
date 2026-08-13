@@ -44,12 +44,8 @@ async def update_roles_for(member):
   logging.info(f'Updating XP roles for {member.id}')
   assert member.guild.id == config['guild']
   level = xp_to_level(member.xp)
-  for threshold, role in config['xp_roles']:
-    role = discord.Object(role)
-    if level >= threshold:
-      await member.add_roles(role)
-    else:
-      await member.remove_roles(role)
+  await member.remove_roles(*(discord.Object(role) for threshold, role in config['xp_roles'] if level < threshold), atomic=False)
+  await member.add_roles(*(discord.Object(role) for threshold, role in config['xp_roles'] if level >= threshold), atomic=False)
 
 async def update_roles():
   logging.info('Updating XP roles for all members')

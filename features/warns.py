@@ -33,7 +33,7 @@ async def update_roles_for(member):
   assert member.guild.id == config['guild']
   roles = [discord.Object(i) for i in config['warn_roles']]
   do_expires(member.id)
-  await member.remove_roles(*roles)
+  await member.remove_roles(*roles, atomic=False)
   count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(member.id, []) + [member.id] for warn in database.data.get('warns', {}).get(account, []))
   if count > 0 and roles:
     await member.add_roles(roles[min(count, len(roles)) - 1])
