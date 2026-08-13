@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 options = {
   'config': 'config.json',
@@ -153,7 +154,7 @@ def parse_duration(string):
   return result
 
 def format_datetime(datetime):
-  return datetime.strftime('%-d %B %Y %H:%M') # %-d is not portable.
+  return datetime.astimezone(ZoneInfo(config['timezone'])).strftime('%-d %B %Y %H:%M') # %-d is not portable.
 
 def mention_datetime(datetime, *, relative=False):
   timestamp = int(datetime.timestamp())
