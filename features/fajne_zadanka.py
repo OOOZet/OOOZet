@@ -102,9 +102,17 @@ async def find_problem(url):
       return url, (await fetch_html(url)).title.text.partition(' - ')[2]
 
   elif url.hostname == 'usaco.org':
-    if path == '/index.php' and query.get('page', [''])[-1] == 'viewproblem2' and (match := re.match('([0-9]+)', query.get('cpid', [''])[-1])):
-      url = f'https://usaco.org/index.php?page=viewproblem2&cpid={int(match[1])}'
+    if path == '/index.php' and query.get('page', [''])[-1] == 'viewproblem2' and (match := re.match('[0-9]+', query.get('cpid', [''])[-1])):
+      url = f'https://usaco.org/index.php?page=viewproblem2&cpid={int(match[0])}'
       return url, (await fetch_html(url)).find(class_='panel').find_all('h2')[-1].text.partition('.')[2].strip()
+
+  elif url.hostname == 'onlinejudge.org':
+    if path == '/index.php' and \
+       query.get('option', [''])[-1] == 'com_onlinejudge' and \
+       query.get('page', [''])[-1] == 'show_problem' and \
+       (match := re.match('[0-9]+', query.get('problem', [''])[-1])):
+      url = f'https://onlinejudge.org/index.php?option=com_onlinejudge&Itemid=8&page=show_problem&problem={int(match[0])}'
+      return url, (await fetch_html(url)).find(id='col3').find_all('tr')[1].h3.text.partition(' - ')[2]
 
 async def fix(id):
   msg = await bot.get_channel(config['fajne_zadanka_channel']).fetch_message(id)
