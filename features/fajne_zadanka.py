@@ -18,7 +18,10 @@ import aiohttp, asyncio, discord, logging, os, re
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from hashlib import sha512
 from io import StringIO
+from secrets import token_urlsafe
+from time import time
 from urllib.parse import parse_qs, unquote, urlparse
 
 import console, database
@@ -26,13 +29,21 @@ from common import config, parse_duration
 
 bot = None
 
-async def fetch_html(url):
-  async with aiohttp.ClientSession(raise_for_status=True) as session:
-    return BeautifulSoup(await (await session.get(url)).text(), 'lxml')
+async def codeforces_auth_middleware(request, handler):
+  url = request.url.update_query(apiKey=config['codeforces_api_key'], time=int(time())).without_query_params('apiSig')
+  salt = token_urlsafe(4)
+  query = '&'.join(f'{k}={v}' for k, v in sorted(url.query.items()))
+  hash = sha512(f'{salt}/{url.name}?{query}#{config["codeforces_api_secret"]}'.encode()).hexdigest()
+  request.url = url.update_query(apiSig=salt + hash)
+  return await handler(request)
 
-async def fetch_json(url):
+async def fetch_html(*args, **kwargs):
   async with aiohttp.ClientSession(raise_for_status=True) as session:
-    return await (await session.get(url)).json()
+    return BeautifulSoup(await (await session.get(*args, **kwargs)).text(), 'lxml')
+
+async def fetch_json(*args, **kwargs):
+  async with aiohttp.ClientSession(raise_for_status=True) as session:
+    return await (await session.get(*args, **kwargs)).json()
 
 async def find_problem(url):
   url = urlparse(unquote(url))
@@ -44,7 +55,7 @@ async def find_problem(url):
        (match := re.fullmatch('/problemset/problem/([0-9]+)/([A-Za-z0-9]+)', path)):
       contest = int(match[1])
       letter = match[2].upper()
-      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}')
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}', middlewares=[codeforces_auth_middleware])
       return (
         'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}/problem/{letter}',
         next(i['name'] for i in json['result']['problems'] if i['index'] == letter),
@@ -52,7 +63,7 @@ async def find_problem(url):
 
     elif match := re.match('/(?:contest|gym)/([0-9]+)', path):
       contest = int(match[1])
-      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}')
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}', middlewares=[codeforces_auth_middleware])
       return (
         'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}',
         json['result']['contest']['name'],

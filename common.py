@@ -86,6 +86,8 @@ config = {
   'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
   'codeforces_poll_rate': '1h',              # Częstotliwość aktualizowania listy rund
   'codeforces_api_lag': '1m',                # Maksymalny czas przetwarzania aktualizacji danych przez Codeforces
+  'codeforces_api_key': None,                # Pole "key" klucza do API Codeforces
+  'codeforces_api_secret': None,             # Pole "secret" klucza do API Codeforces
 
   'atcoder_channel': None,                   # Kanał, na który są wysyłane przypomnienia o kontestach na AtCoder
   'atcoder_role': None,                      # Rola, która jest pingowana w przypomnieniach o kontestach
@@ -111,7 +113,7 @@ config = {
 
 def redacted_config():
   result = config.copy()
-  for key in ['token', 'websub_host', 'youtube_api_key', 'clist_api_key', 'clist_username']:
+  for key in ['token', 'websub_host', 'youtube_api_key', 'codeforces_api_key', 'codeforces_api_secret', 'clist_api_key', 'clist_username']:
     result[key] = '[hidden]'
   return result
 

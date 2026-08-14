@@ -70,6 +70,9 @@ async def setup(bot):
     ids = list(ids)
     logging.info(f'Processing YouTube videos: {ids!r}')
 
+    if not ids:
+      return
+
     async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
       response = await session.get('videos', params={'key': config['youtube_api_key'], 'part': 'snippet,liveStreamingDetails', 'id': ids})
       if not response.ok:
