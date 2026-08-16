@@ -121,7 +121,8 @@ config = {
     ['1 dzień', '1d'],
     ['3 dni', '3d'],
     ['1 tydzień', '1w'],
-  ]
+  ],
+  'purge_max_age': '1w',                     # Maksymalny wiek wiadomości, które /purge może usunąć
 }
 
 def redacted_config():

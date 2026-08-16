@@ -123,7 +123,7 @@ async def setup(_bot):
             deletedc += len(await channel.purge(
               check=lambda msg: msg.author == user,
               after=interaction2.created_at - timedelta(seconds=max_age),
-              reason=f'Na prośbę {interaction.user}',
+              reason=f'Na żądanie {interaction.user}',
               limit=None,
             ))
 
@@ -151,3 +151,59 @@ async def setup(_bot):
   @check_staff('usuwania wiadomości')
   async def menu_purge_everywhere(interaction, user: discord.User):
     await purge_everywhere(interaction, user)
+
+  @bot.tree.command(description='Usuwa wiadomości na tym kanale')
+  @discord.app_commands.guild_only
+  @discord.app_commands.rename(from_='from')
+  @discord.app_commands.describe(from_='ID pierwszej wiadomości do usunięcia', to='ID ostatniej wiadomości do usunięcia')
+  @check_staff('usuwania wiadomości')
+  async def purge(interaction, from_: str, to: str | None, user: discord.User | None):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+      from_ = await interaction.channel.fetch_message(int(from_))
+    except (discord.NotFound, ValueError):
+      await interaction.followup.send('Początkowa wiadomość o takim ID nie istnieje na tym kanale… 🤨', ephemeral=True)
+      return
+    max_age = parse_duration(config['purge_max_age'])
+    if from_.created_at < interaction.created_at - timedelta(seconds=max_age):
+      await interaction.followup.send(f'Nie mogę usuwać wiadomości starszych niż {max_age} sekund… 😨', ephemeral=True)
+      return
+    if to is not None:
+      try:
+        to = await interaction.channel.fetch_message(int(to))
+      except (discord.NotFound, ValueError):
+        await interaction.followup.send('Ostatnia wiadomość o takim ID nie istnieje na tym kanale… 🤨', ephemeral=True)
+        return
+
+    logging.info(
+      f'{interaction.user.id} requested to purge messages in channel {interaction.channel.id}' +
+      ('' if from_ is None else f' from {from_.id}') +
+      ('' if to is None else f' to {to.id}') +
+      ('' if user is None else f' by {user.id}')
+    )
+
+    try:
+      try:
+        await from_.delete()
+        deletedc = 1
+      except discord.NotFound:
+        deletedc = 0
+      deletedc += len(await interaction.channel.purge(
+        after=from_,
+        before=to,
+        check=lambda msg: user is None or msg.author == user,
+        reason=f'Na żądanie {interaction.user}',
+        limit=None,
+      ))
+      if to is not None and from_ != to:
+        try:
+          await to.delete()
+          deletedc += 1
+        except discord.NotFound:
+          pass
+
+    except discord.Forbidden:
+      await interaction.followup.send(f'Nie mam uprawnień, żeby usuwać wiadomości… 🧐', ephemeral=True)
+    else:
+      await interaction.followup.send(f'Pomyślnie usunięto {deletedc} {"wiadomość" if deletedc == 1 else "wiadomości"} na tym kanale. 🫡', ephemeral=True)
