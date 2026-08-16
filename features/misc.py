@@ -18,7 +18,7 @@ import discord, logging, random
 from datetime import datetime
 
 import database
-from common import config, debacktick, hybrid_check, loop, parse_duration
+from common import config, hybrid_check, loop, parse_duration
 from features import warns, xp
 from features.utils import check_staff
 
@@ -34,6 +34,15 @@ class NoStaffError(discord.app_commands.CheckFailure):
 def check_staff_nonempty(interaction):
   if all(not bot.get_guild(config['guild']).get_role(i).members for i in config['staff_roles']):
     raise NoStaffError()
+
+async def update_roles_for(member):
+  logging.info(f'Updating timeout role for {member.id}')
+  if config['timeout_role'] is not None:
+    role = discord.Object(config['timeout_role'])
+    if member.is_timed_out():
+      await member.add_roles(role)
+    else:
+      await member.remove_roles(role)
 
 async def setup(_bot):
   global bot
@@ -55,6 +64,7 @@ async def setup(_bot):
     await interaction.response.defer(ephemeral=True)
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
+    await update_roles_for(member)
     await interaction.followup.send(f'Pomyślnie zaktualizowano role za warny i XP dla {member.mention}. 👌')
 
   @bot.listen()
@@ -65,8 +75,7 @@ async def setup(_bot):
     logging.info(f'{member.id} joined the guild')
     await warns.update_roles_for(member)
     await xp.update_roles_for(member)
-    if member.is_timed_out() and config['timeout_role'] is not None:
-      await member.add_roles(discord.Object(config['timeout_role']))
+    await update_roles_for(member)
 
   @bot.listen()
   async def on_member_remove(member):
@@ -140,90 +149,6 @@ async def setup(_bot):
   async def on_message(msg):
     if msg.channel.id in config['media_channels'] and all(i.width is None and i.height is None for i in msg.attachments):
       await msg.delete()
-
-  async def kick(interaction, member):
-    if not isinstance(member, discord.Member):
-      await interaction.response.send_message(f'{member.mention} nie jest już na tym serwerze… 🤨', ephemeral=True)
-    elif interaction.user == member:
-      await interaction.response.send_message('Nie możesz skickować samego siebie… 🤨', ephemeral=True)
-    elif interaction.user.top_role <= member.top_role and interaction.user != interaction.guild.owner:
-      await interaction.response.send_message(f'Nie jesteś wyżej w hierarchii od {member.mention}… 🤨', ephemeral=True)
-    else:
-      try:
-        await member.kick(reason=f'Na żądanie {interaction.user}')
-      except discord.Forbidden:
-        await interaction.response.send_message(f'Nie mam uprawnień, żeby skickować {member.mention}… 🧐', ephemeral=True)
-      else:
-        logging.info(f'{interaction.user.id} kicked {member.id}')
-        await interaction.response.send_message(f'Pomyślnie skickowano {member.mention}. 😒', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
-
-  @bot.tree.command(name='kick', description='Kickuje użytkownika')
-  @discord.app_commands.guild_only
-  @check_staff('kickowania')
-  async def cmd_kick(interaction, member: discord.Member):
-    await kick(interaction, member)
-
-  @bot.tree.context_menu(name='Skickuj')
-  @discord.app_commands.guild_only
-  @check_staff('kickowania')
-  async def menu_kick(interaction, member: discord.Member):
-    await kick(interaction, member)
-
-  async def ban(interaction, user, reason):
-    if interaction.user == user:
-      await interaction.response.send_message('Nie możesz zbanować samego siebie… 🤨', ephemeral=True)
-    elif isinstance(user, discord.Member) and interaction.user.top_role <= user.top_role and interaction.user != interaction.guild.owner:
-      await interaction.response.send_message(f'Nie jesteś wyżej w hierarchii od {user.mention}… 🤨', ephemeral=True)
-    else:
-      try:
-        await interaction.guild.ban(user, reason=f'{reason} — {interaction.user}', delete_message_seconds=0)
-      except discord.Forbidden:
-        await interaction.response.send_message(f'Nie mam uprawnień, żeby zbanować {user.mention}… 🧐', ephemeral=True)
-      else:
-        logging.info(f'{interaction.user.id} banned {user.id} for {reason!r}')
-        await interaction.response.send_message(f'Pomyślnie zbanowano {user.mention} za `{debacktick(reason)}`. 😒', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
-
-  @bot.tree.command(name='ban', description='Banuje użytkownika')
-  @discord.app_commands.guild_only
-  @check_staff('banowania')
-  async def cmd_ban(interaction, user: discord.User, reason: str):
-    await ban(interaction, user, reason)
-
-  @bot.tree.context_menu(name='Zbanuj')
-  # @discord.app_commands.guild_only
-  @discord.app_commands.guilds(config['guild']) # HACK: Max number of global context menu commands is 5.
-  @check_staff('banowania')
-  async def menu_ban(interaction, user: discord.User):
-    async def on_submit(interaction2):
-      await ban(interaction2, user, text_input.value)
-
-    text_input = discord.ui.TextInput(label='Powód')
-    modal = discord.ui.Modal(title=f'Zbanuj {user}')
-    modal.on_submit = on_submit
-    modal.add_item(text_input)
-    await interaction.response.send_modal(modal)
-
-  async def unban(interaction, user):
-    try:
-      await interaction.guild.unban(user, reason=f'Na żądanie {interaction.user}')
-      logging.info(f'{interaction.user.id} unbanned {user.id}')
-    except discord.NotFound:
-      await interaction.response.send_message(f'{user.mention} nie jest obecnie zbanowany… 🤨', ephemeral=True)
-    else:
-      await interaction.response.send_message(f'Pomyślnie odbanowano {user.mention}! 🥳', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
-
-  @bot.tree.command(name='unban', description='Odbanowuje użytkownika')
-  @discord.app_commands.guild_only
-  @check_staff('odbanowywania')
-  async def cmd_unban(interaction, user: discord.User):
-    await unban(interaction, user)
-
-  @bot.tree.context_menu(name='Odbanuj')
-  # @discord.app_commands.guild_only
-  @discord.app_commands.guilds(config['guild']) # HACK: Max number of global context menu commands is 5.
-  @check_staff('odbanowywania')
-  async def menu_unban(interaction, user: discord.User):
-    await unban(interaction, user)
 
   @bot.tree.command(description='Łączy dwa konta tego samego użytkownika')
   @check_staff('łączenia kont')

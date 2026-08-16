@@ -109,6 +109,19 @@ config = {
   'budzik_channel': None,                    # Kanał, na którym użytkownicy pingują poniższe role o odpowiednich godzinach
   'budzik_roles': [],                        # Lista trójek [rola, godzina, minuta] dla ról, których pingowalność jest zarządzana przez bota
   'budzik_max_age_days': 90,                 # Maksymalny wiek pingów pierwszej z powyższych ról branych pod uwagę w rankingu
+
+  'purge_everywhere_max_age_choices': [      # Możliwe wybory maksymalnego wieku wiadomości do usunięcia w /purge-everywhere
+    ['5 minut', '5m'],
+    ['15 minut', '15m'],
+    ['30 minut', '30m'],
+    ['1 godzina', '1h'],
+    ['3 godziny', '3h'],
+    ['6 godzin', '6h'],
+    ['12 godzin', '12h'],
+    ['1 dzień', '1d'],
+    ['3 dni', '3d'],
+    ['1 tydzień', '1w'],
+  ]
 }
 
 def redacted_config():
@@ -137,6 +150,7 @@ def parse_duration(string):
     'm': 60,
     'h': 60 * 60,
     'd': 60 * 60 * 24,
+    'w': 60 * 60 * 24 * 7,
     'y': 60 * 60 * 24 * 365,
   }
   result = 0

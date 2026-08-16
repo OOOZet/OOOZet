@@ -224,7 +224,7 @@ async def setup(_bot):
 
       reason_input = discord.ui.TextInput(label='Powód', default=warn['reason'])
       expired_input = discord.ui.TextInput(required=False, label='Czas wygaśnięcia', default='' if warn['expired'] is None else warn['expired'].isoformat())
-      modal = discord.ui.Modal(title=f'Zedytuj ostrzeżenie')
+      modal = discord.ui.Modal(title='Zedytuj ostrzeżenie')
       modal.on_submit = on_submit
       modal.add_item(reason_input)
       modal.add_item(expired_input)
