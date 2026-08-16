@@ -18,7 +18,7 @@ import discord, logging
 from datetime import timedelta
 from itertools import chain
 
-from common import config, debacktick, parse_duration
+from common import config, debacktick, mention_datetime, parse_duration
 from features.utils import check_staff
 
 bot = None
@@ -112,9 +112,9 @@ async def setup(_bot):
   async def purge_everywhere(interaction, user):
     async def on_submit(interaction2):
       await interaction2.response.defer()
-      max_age = parse_duration(select.values[0])
+      max_age = select.values[0]
 
-      logging.info(f"{interaction.user.id} requested to purge {user.id}'s messages younger than {max_age} seconds everywhere in guild {interaction.guild.id}")
+      logging.info(f"{interaction.user.id} requested to purge {user.id}'s messages younger than {max_age} everywhere in guild {interaction.guild.id}")
 
       try:
         deletedc = 0
@@ -122,7 +122,7 @@ async def setup(_bot):
           if hasattr(channel, 'purge'):
             deletedc += len(await channel.purge(
               check=lambda msg: msg.author == user,
-              after=interaction2.created_at - timedelta(seconds=max_age),
+              after=interaction2.created_at - timedelta(seconds=parse_duration(max_age)),
               reason=f'Na żądanie {interaction.user}',
               limit=None,
             ))
@@ -133,8 +133,8 @@ async def setup(_bot):
         await interaction2.followup.send(f'Pomyślnie usunięto {deletedc} {"wiadomość" if deletedc == 1 else "wiadomości"} użytkownika {user.mention} ze wszystkich kanałów. 😒', ephemeral=True)
 
     select = discord.ui.Select()
-    for label, seconds in config['purge_everywhere_max_age_choices']:
-      select.add_option(label=label, value=seconds)
+    for label, duration in config['purge_everywhere_max_age_choices']:
+      select.add_option(label=label, value=duration)
     modal = discord.ui.Modal(title=f'Usuń wiadomości {user} wszędzie')
     modal.on_submit = on_submit
     modal.add_item(discord.ui.Label(text='Maksymalny wiek wiadomości do usunięcia', component=select))
@@ -207,3 +207,48 @@ async def setup(_bot):
       await interaction.followup.send(f'Nie mam uprawnień, żeby usuwać wiadomości… 🧐', ephemeral=True)
     else:
       await interaction.followup.send(f'Pomyślnie usunięto {deletedc} {"wiadomość" if deletedc == 1 else "wiadomości"} na tym kanale. 🫡', ephemeral=True)
+
+  @bot.tree.command(name='timeout-here', description='Timeoutuje autorów ostatnich wiadomości na tym kanale')
+  @discord.app_commands.rename(max_age='max-age')
+  @discord.app_commands.describe(max_age='Maksymalny wiek rozważanych wiadomości')
+  @discord.app_commands.choices(
+    max_age=[discord.app_commands.Choice(name=label, value=duration) for label, duration in config['timeout_here_max_age_choices']],
+    duration=[discord.app_commands.Choice(name=label, value=duration) for label, duration in [
+      ['60 sekund', '60s'],
+      ['5 minut', '5m'],
+      ['10 minut', '10m'],
+      ['1 godzina', '1h'],
+      ['1 dzień', '1d'],
+      ['1 tydzień', '1w'],
+    ]]
+  )
+  @check_staff('timeoutowania')
+  async def timeout_here(interaction, max_age: str, duration: str = '1h'):
+    await interaction.response.defer(ephemeral=True)
+
+    logging.info(f'{interaction.user.id} requested to timeout for {duration} authors of messages younger than {max_age} in {interaction.channel.id}')
+
+    timed_out = set()
+    skipped = set()
+    expiry_time = interaction.created_at + timedelta(seconds=parse_duration(duration))
+
+    async for msg in interaction.channel.history(after=interaction.created_at - timedelta(seconds=parse_duration(max_age)), limit=None):
+      if hasattr(msg.author, 'timeout') and msg.author not in timed_out and msg.author not in skipped and (msg.author.timed_out_until is None or msg.author.timed_out_until < expiry_time):
+        try:
+          await msg.author.timeout(expiry_time, reason=f'/timeout-here na żądanie {interaction.user}')
+        except discord.Forbidden:
+          skipped.add(msg.author)
+        else:
+          timed_out.add(msg.author)
+
+    if not timed_out and not skipped:
+      await interaction.followup.send(f'Nie znalazłem żadnych użytkowników do stimeoutowania… 🧐', ephemeral=True)
+    else:
+      msg = ''
+      if timed_out:
+        msg += f'Pomyślnie stimeoutowano {", ".join(i.mention for i in timed_out)} do {mention_datetime(expiry_time)}. 😒'
+      if skipped:
+        if msg:
+          msg += '\n'
+        msg += f'Nie mam uprawnień, żeby timeoutować {", ".join(i.mention for i in skipped)}… 🧐'
+      await interaction.followup.send(msg, ephemeral=True)

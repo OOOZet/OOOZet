@@ -146,6 +146,7 @@ async def setup(bot):
     await resend(interaction)
 
   @rules.command(name='set', description='Ustanawia nowy regulamin')
+  @discord.app_commands.rename(ile_sugestii='ile-sugestii')
   @check_staff('ustanawiania nowego regulaminu')
   async def set_(interaction, text: discord.Attachment, ile_sugestii: discord.app_commands.Range[int, 0, 4]): # Max is 4 due to a limitation in Discord.
     try:

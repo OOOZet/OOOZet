@@ -123,6 +123,14 @@ config = {
     ['1 tydzień', '1w'],
   ],
   'purge_max_age': '1w',                     # Maksymalny wiek wiadomości, które /purge może usunąć
+  'timeout_here_max_age_choices': [          # Możliwe wybory maksymalnego wieku wiadomości branych pod uwagę w /timeout-here
+    ['1 minuta', '1m'],
+    ['5 minut', '5m'],
+    ['15 minut', '15m'],
+    ['30 minut', '30m'],
+    ['1 godzina', '1h'],
+    ['3 godziny', '3h'],
+  ],
 }
 
 def redacted_config():
