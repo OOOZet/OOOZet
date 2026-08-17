@@ -45,7 +45,6 @@ config = {
   'timeout_poll_rate': '1m',                 # Częstotliwość sprawdzania wygaśnięcia timeoutów
   'media_channels': [],                      # Kanały, na które można wysyłać tylko zdjęcia i filmy
 
-  'warn_roles': [],                          # Role kosmetyczne wskazujące na liczbę warnów użytkownika
   'warn_expire_interval': { 'months': 3 },   # Obiekt relativedelta określający odstęp czasu od ostatniej zmianie w liczbie warnów użytkownika, po którym wygasa najstarszy warn
   'counting_channel': None,                  # Kanał "#liczenie"
   'fajne_zadanka_channel': None,             # Kanał, na który użytkownicy mogą wysyłać linki do zadań algorytmicznych

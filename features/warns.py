@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, random
+import discord, logging, random
 from dataclasses import dataclass
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -24,29 +24,12 @@ import console, database
 from common import config, debacktick, format_datetime, limit_len, mention_date, mention_datetime, pages_view, select_view
 from features.utils import check_staff, is_staff
 
-# TODO: update roles on expire
-
 warn_expiration_is_enabled = True
 
 bot = None
 
 def warns_of(user):
   return [warn for account in database.data.get('linked_users', {}).get(user, []) + [user] for warn in database.data.get('warns', {}).get(account, [])]
-
-async def update_roles_for(member):
-  logging.info(f'Updating warn roles for {member.id}')
-  assert member.guild.id == config['guild']
-  roles = [discord.Object(i) for i in config['warn_roles']]
-  do_expires(member.id)
-  await member.remove_roles(*roles, atomic=False)
-  count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(member.id, []) + [member.id] for warn in database.data.get('warns', {}).get(account, []))
-  if count > 0 and roles:
-    await member.add_roles(roles[min(count, len(roles)) - 1])
-
-async def update_roles():
-  logging.info('Updating warn roles for all members')
-  for member in bot.get_guild(config['guild']).members:
-    await update_roles_for(member)
 
 def do_expires(user): # Restarting this algorithm at any point during its execution is corruption-free, so we don't need to acquire database.lock.
   if not warn_expiration_is_enabled:
@@ -103,9 +86,6 @@ async def setup(_bot):
     database.data['warns'][user.id].sort(key=lambda x: x['time'])
     database.should_save = True
 
-    if (member := bot.get_guild(config['guild']).get_member(user.id)) is not None:
-      await update_roles_for(member)
-
     do_expires(user.id)
     count = sum(not warn['expired'] for warn in warns_of(user.id))
     await interaction.response.send_message(f'{user.mention} właśnie dostał swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
@@ -143,9 +123,6 @@ async def setup(_bot):
       logging.info(f'Erasing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
       database.data['warns'][user.id].remove(warn)
       database.should_save = True
-
-      if (member := bot.get_guild(config['guild']).get_member(user.id)) is not None:
-        await update_roles_for(member)
 
       reason = debacktick(warn['reason'])
       time = mention_datetime(warn['time'])
@@ -368,6 +345,5 @@ async def setup(_bot):
     await interaction.response.send_message(f'Pomyślnie {"włączono" if warn_expiration_is_enabled else "wyłączono"} wygaszanie ostrzeżeń. 🫡', ephemeral=True)
 
 console.begin('warns')
-console.register('update_roles', None, 'updates warn roles for all members', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())
 console.register('do_expires_all', None, 'applies any pending expires', do_expires_all)
 console.end()

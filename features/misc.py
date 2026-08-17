@@ -19,7 +19,7 @@ from datetime import datetime
 
 import database
 from common import config, hybrid_check, loop, parse_duration
-from features import warns, xp
+from features import xp
 from features.utils import check_staff
 
 bot = None
@@ -62,10 +62,9 @@ async def setup(_bot):
       member = interaction.user
     logging.info(f'Received user request to update roles for {member.id}')
     await interaction.response.defer(ephemeral=True)
-    await warns.update_roles_for(member)
     await xp.update_roles_for(member)
     await update_roles_for(member)
-    await interaction.followup.send(f'Pomyślnie zaktualizowano role za warny i XP dla {member.mention}. 👌')
+    await interaction.followup.send(f'Pomyślnie zaktualizowano role za XP i timeouty dla {member.mention}. 👌')
 
   @bot.listen()
   async def on_member_join(member):
@@ -73,7 +72,6 @@ async def setup(_bot):
       return
 
     logging.info(f'{member.id} joined the guild')
-    await warns.update_roles_for(member)
     await xp.update_roles_for(member)
     await update_roles_for(member)
 
