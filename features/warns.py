@@ -26,6 +26,8 @@ from features.utils import check_staff, is_staff
 
 # TODO: update roles on expire
 
+warn_expiration_is_enabled = True
+
 bot = None
 
 def warns_of(user):
@@ -47,6 +49,9 @@ async def update_roles():
     await update_roles_for(member)
 
 def do_expires(user): # Restarting this algorithm at any point during its execution is corruption-free, so we don't need to acquire database.lock.
+  if not warn_expiration_is_enabled:
+    return
+
   warns = warns_of(user)
   warns.sort(key=lambda x: x['time'])
   if not warns:
@@ -258,7 +263,7 @@ async def setup(_bot):
   async def menu_edit_warn(interaction, user: discord.User):
     await edit_warn(interaction, user)
 
-  async def warns(interaction, user):
+  async def warns(interaction, user, should_be_verbose=False):
     do_expires(user.id)
     active, expired = [], []
     for account in database.data.get('linked_users', {}).get(user.id, []) + [user.id]:
@@ -276,6 +281,9 @@ async def setup(_bot):
         pages.append('')
       pages[-1] += line
 
+    if not warn_expiration_is_enabled and is_staff(interaction.user):
+      append('## Wygaszanie ostrzeżeń jest wyłączone! ⚠️\n')
+
     if active:
       append(random.choice([
         f'{user.mention} ma już na swoim koncie parę złych uczynków… 😔\n',
@@ -284,15 +292,15 @@ async def setup(_bot):
       ]))
       for warn, account in reversed(active):
         reason = debacktick(warn['reason'])
-        time = mention_datetime(warn['time'])
+        time = f'`{warn["time"].isoformat()}`' if should_be_verbose else mention_datetime(warn['time'])
         append(f'- `{reason}` w dniu {time}' + (f' na koncie <@{account}>' if account != user.id else '') + '\n')
 
     if expired and is_staff(interaction.user):
       append(f'Wygasłe ostrzeżenia użytkownika {user.mention}: 📜\n')
       for warn, account in reversed(expired):
         reason = debacktick(warn['reason'])
-        time = mention_datetime(warn['time'])
-        expired = mention_date(warn['expired'])
+        time = f'`{warn["time"].isoformat()}`' if should_be_verbose else mention_datetime(warn['time'])
+        expired = f'`{warn["expired"].isoformat()}`' if should_be_verbose else mention_date(warn['expired'])
         append(f'- `{reason}` z dnia {time} wygasłe {expired}' + (f' na koncie <@{account}>' if account != user.id else '') + '\n')
 
     if pages == ['']:
@@ -307,8 +315,9 @@ async def setup(_bot):
     await interaction.response.send_message(pages[0], view=view, ephemeral=True)
 
   @bot.tree.command(name='warns', description='Pokazuje ostrzeżenia użytkownika')
-  async def cmd_warns(interaction, user: discord.User | None):
-    await warns(interaction, interaction.user if user is None else user)
+  @discord.app_commands.describe(verbose='Pokazuje daty w formacie przyjmowanym przez /edit-warn')
+  async def cmd_warns(interaction, user: discord.User | None, verbose: bool = False):
+    await warns(interaction, interaction.user if user is None else user, verbose)
 
   @bot.tree.context_menu(name='Pokaż ostrzeżenia')
   async def menu_warns(interaction, user: discord.User):
@@ -329,6 +338,9 @@ async def setup(_bot):
         pages.append('')
       pages[-1] += line
 
+    if not warn_expiration_is_enabled:
+      append('## Wygaszanie ostrzeżeń jest wyłączone! ⚠️\n')
+
     append('Historia wszystkich ostrzeżeń na serwerze: 📜\n')
     for warn, account in reversed(all_warns):
       reason = debacktick(warn['reason'])
@@ -346,6 +358,14 @@ async def setup(_bot):
     view = pages_view(0, len(pages), on_select_page, interaction.user)
 
     await interaction.response.send_message(pages[0], view=view, ephemeral=True)
+
+  @bot.tree.command(name='toggle-warn-expiration', description='Włącza lub wyłącza wygaszanie ostrzeżeń')
+  @check_staff('włączania lub wyłączania wygaszania ostrzeżeń')
+  async def toggle_warn_expiration(interaction):
+    global warn_expiration_is_enabled
+    warn_expiration_is_enabled = not warn_expiration_is_enabled
+    logging.info(f'{interaction.user.id} {"enabled" if warn_expiration_is_enabled else "disabled"} warn expiration')
+    await interaction.response.send_message(f'Pomyślnie {"włączono" if warn_expiration_is_enabled else "wyłączono"} wygaszanie ostrzeżeń. 🫡', ephemeral=True)
 
 console.begin('warns')
 console.register('update_roles', None, 'updates warn roles for all members', lambda: asyncio.run_coroutine_threadsafe(update_roles(), bot.loop).result())
