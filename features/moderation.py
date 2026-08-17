@@ -128,9 +128,9 @@ async def setup(_bot):
             ))
 
       except discord.Forbidden:
-        await interaction2.followup.send(f'Nie mam uprawnień, żeby usuwać wiadomości… 🧐', ephemeral=True)
+        await interaction2.followup.send(f'Nie mam uprawnień do usuwania wiadomości… 🧐', ephemeral=True)
       else:
-        await interaction2.followup.send(f'Pomyślnie usunięto {deletedc} {"wiadomość" if deletedc == 1 else "wiadomości"} użytkownika {user.mention} ze wszystkich kanałów. 😒', ephemeral=True)
+        await interaction2.followup.send(f'Pomyślnie usunięto {deletedc} {"wiadomość" if deletedc == 1 else "wiadomości"} użytkownika {user.mention} ze wszystkich kanałów. 😒', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
 
     select = discord.ui.Select()
     for label, duration in config['purge_everywhere_max_age_choices']:
@@ -204,11 +204,12 @@ async def setup(_bot):
           pass
 
     except discord.Forbidden:
-      await interaction.followup.send(f'Nie mam uprawnień, żeby usuwać wiadomości… 🧐', ephemeral=True)
+      await interaction.followup.send(f'Nie mam uprawnień do usuwania wiadomości… 🧐', ephemeral=True)
     else:
       await interaction.followup.send(f'Pomyślnie usunięto {deletedc} {"wiadomość" if deletedc == 1 else "wiadomości"} na tym kanale. 🫡', ephemeral=True)
 
   @bot.tree.command(name='timeout-here', description='Timeoutuje autorów ostatnich wiadomości na tym kanale')
+  @discord.app_commands.guild_only
   @discord.app_commands.rename(max_age='max-age')
   @discord.app_commands.describe(max_age='Maksymalny wiek rozważanych wiadomości')
   @discord.app_commands.choices(
@@ -250,5 +251,5 @@ async def setup(_bot):
       if skipped:
         if msg:
           msg += '\n'
-        msg += f'Nie mam uprawnień, żeby timeoutować {", ".join(i.mention for i in skipped)}… 🧐'
-      await interaction.followup.send(msg, ephemeral=True)
+        msg += f'Nie mam uprawnień, żeby stimeoutować {", ".join(i.mention for i in skipped)}… 🧐'
+      await interaction.followup.send(msg, ephemeral=True, allowed_mentions=discord.AllowedMentions(users=timed_out))

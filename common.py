@@ -131,6 +131,18 @@ config = {
     ['1 godzina', '1h'],
     ['3 godziny', '3h'],
   ],
+
+  'ping_role_cooldown': '5m',                # Cooldown na użycie komendy /ping-role
+  'ping_role_rules': [                       # Lista zasad odblokowujących role w /ping-role. Zasady są sprawdzane od pierwszej do ostatniej po wysłaniu formularza z wybraną rolą. Poniżej przykładowy wpis:
+    {
+      'id': 'example',                       # Unikalne ID zasady
+      'required_role': None,                 # Rola, którą użytkownik musi mieć, albo None
+      'can_have_warns': True,                # Czy użytkownik może mieć warny, czy ich mieć nie może
+      'cooldown': '30m',                     # Cooldown na użycie tej zasady
+      'cooldown_is_per_user': False,         # Czy każdy użytkownik ma swój osobny cooldown, czy jeden i ten sam cooldown stosuje się do wszystkich użytkowników
+      'unlocked_roles': []                   # Role, które ta zasada odblokowuje. Jeśli wybrana rola jest w tej liście i powyższe warunki są spełnione, zasada zostaje użyta i sprawdzanie pozwolenia na ping zostaje zakończone powodzeniem.
+    }
+  ],
 }
 
 def redacted_config():

@@ -28,6 +28,9 @@ from features.utils import check_staff, is_staff
 
 bot = None
 
+def warns_of(user):
+  return [warn for account in database.data.get('linked_users', {}).get(user, []) + [user] for warn in database.data.get('warns', {}).get(account, [])]
+
 async def update_roles_for(member):
   logging.info(f'Updating warn roles for {member.id}')
   assert member.guild.id == config['guild']
@@ -44,7 +47,7 @@ async def update_roles():
     await update_roles_for(member)
 
 def do_expires(user): # Restarting this algorithm at any point during its execution is corruption-free, so we don't need to acquire database.lock.
-  warns = [warn for account in database.data.get('linked_users', {}).get(user, []) + [user] for warn in database.data.get('warns', {}).get(account, [])]
+  warns = warns_of(user)
   warns.sort(key=lambda x: x['time'])
   if not warns:
     return
@@ -99,7 +102,7 @@ async def setup(_bot):
       await update_roles_for(member)
 
     do_expires(user.id)
-    count = sum(not warn['expired'] for account in database.data.get('linked_users', {}).get(user.id, []) + [user.id] for warn in database.data['warns'].get(account, []))
+    count = sum(not warn['expired'] for warn in warns_of(user.id))
     await interaction.response.send_message(f'{user.mention} właśnie dostał swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
 
   @bot.tree.command(name='warn', description='Ostrzega użytkownika')
