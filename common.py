@@ -138,7 +138,7 @@ config = {
       'required_role': None,                 # Rola, którą użytkownik musi mieć, albo None
       'can_have_warns': True,                # Czy użytkownik może mieć warny, czy ich mieć nie może
       'cooldown': '30m',                     # Cooldown na użycie tej zasady
-      'cooldown_is_per_user': False,         # Czy każdy użytkownik ma swój osobny cooldown, czy jeden i ten sam cooldown stosuje się do wszystkich użytkowników
+      'cooldown_subject': 'role',            # Typ bytu, na który nakładany jest cooldown, możliwe wartości: 'user', 'role', None (cooldown na użycie zasady jest globalny)
       'unlocked_roles': []                   # Role, które ta zasada odblokowuje. Jeśli wybrana rola jest w tej liście i powyższe warunki są spełnione, zasada zostaje użyta i sprawdzanie pozwolenia na ping zostaje zakończone powodzeniem.
     }
   ],

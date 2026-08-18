@@ -193,18 +193,30 @@ async def setup(_bot):
           await interaction3.response.send_message('Podany czas wygaśnięcia nie jest poprawnym czasem w formacie ISO 8601… 😕', view=view, ephemeral=True)
 
         else:
-          old_reason = debacktick(warn['reason'])
-          old_expired = 'żadnego' if warn['expired'] is None else mention_datetime(warn['expired'])
+          old_reason = warn['reason']
+          old_expired = warn['expired']
 
           logging.info(f'Edited warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
           warn['reason'] = new_reason
           warn['expired'] = new_expired
           database.should_save = True
 
-          new_reason = debacktick(warn['reason'])
-          new_expired = 'żaden' if warn['expired'] is None else mention_datetime(warn['expired'])
-          time = mention_datetime(warn['time'])
-          await interaction.edit_original_response(content=f'Pomyślnie zmieniono powód z `{old_reason}` na `{new_reason}` i czas wygaśnięcia z {old_expired} na {new_expired} w ostrzeżeniu użytkownika {user.mention} z dnia {time}. 🫡', view=None)
+          msg = 'Pomyślnie '
+          if old_reason == new_reason and old_expired == new_expired:
+            msg += 'nic nie zmieniono'
+          else:
+            msg += 'zmieniono '
+            parts = []
+            if old_reason != new_reason:
+              parts.append(f'powód z `{debacktick(old_reason)}` na `{debacktick(new_reason)}`')
+            if old_expired != new_expired:
+              old_expired = 'żadnego' if old_expired is None else mention_datetime(old_expired)
+              new_expired = 'żaden' if new_expired is None else mention_datetime(new_expired)
+              parts.append(f'czas wygaśnięcia z {old_expired} na {new_expired}')
+            msg += ' i '.join(parts)
+          msg += f' w ostrzeżeniu użytkownika {user.mention} z dnia {mention_datetime(warn["time"])}. 🫡'
+
+          await interaction.edit_original_response(content=msg, view=None)
           await interaction3.response.defer()
 
       reason_input = discord.ui.TextInput(label='Powód', default=warn['reason'])
@@ -280,9 +292,8 @@ async def setup(_bot):
         expired = f'`{warn["expired"].isoformat()}`' if should_be_verbose else mention_date(warn['expired'])
         append(f'- `{reason}` z dnia {time} wygasłe {expired}' + (f' na koncie <@{account}>' if account != user.id else '') + '\n')
 
-    if pages == ['']:
-      await interaction.response.send_message(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych ostrzeżeń! 😇', ephemeral=True)
-      return
+    if not active and not (expired and is_staff(interaction.user)):
+      append(f'{user.mention} jest grzeczny jak aniołek i nie nazbierał jeszcze żadnych ostrzeżeń! 😇')
 
     async def on_select_page(interaction2, page):
       await interaction2.response.defer()
@@ -318,16 +329,16 @@ async def setup(_bot):
     if not warn_expiration_is_enabled:
       append('## Wygaszanie ostrzeżeń jest wyłączone! ⚠️\n')
 
-    append('Historia wszystkich ostrzeżeń na serwerze: 📜\n')
-    for warn, account in reversed(all_warns):
-      reason = debacktick(warn['reason'])
-      time = mention_datetime(warn['time'])
-      expired = '' if warn['expired'] is None else f' wygasłe {mention_date(warn["expired"])}'
-      append(f'- w dniu {time} dla <@{account}> za `{reason}` {expired}\n')
+    if all_warns:
+      append('Historia wszystkich ostrzeżeń na serwerze: 📜\n')
+      for warn, account in reversed(all_warns):
+        reason = debacktick(warn['reason'])
+        time = mention_datetime(warn['time'])
+        expired = '' if warn['expired'] is None else f' wygasłe {mention_date(warn["expired"])}'
+        append(f'- w dniu {time} dla <@{account}> za `{reason}` {expired}\n')
 
-    if pages == ['']:
-      await interaction.response.send_message(f'Wszyscy są grzeczni jak aniołki i nikt nie nazbierał jeszcze żadnych ostrzeżeń! 😇', ephemeral=True)
-      return
+    else:
+      append('Wszyscy są grzeczni jak aniołki i nikt nie nazbierał jeszcze żadnych ostrzeżeń! 😇')
 
     async def on_select_page(interaction2, page):
       await interaction2.response.defer()

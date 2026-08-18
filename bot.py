@@ -21,6 +21,8 @@ from common import config, options
 from features import about_me, budzik, counting, fajne_zadanka, help_forum, misc, moderation, ping_guard, rules, sugestie, utils, warns, xp
 from features.reminders import atcoder, codeforces, youtube
 
+# TODO: lockout
+
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
     await about_me.setup(self)

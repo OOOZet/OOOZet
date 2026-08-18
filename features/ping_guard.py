@@ -58,17 +58,24 @@ async def setup(_bot):
               rules_not_satisfied_msg += '- Masz lub miałeś ostrzeżenia. 😒\n'
               continue
 
-            cooldown = parse_duration(rule['cooldown'])
-            if rule['cooldown_is_per_user']:
-              last_use = database.data.get('ping_role_rule_last_use', {}).get(rule['id'], {}).get(interaction.user.id)
-              if last_use is not None and (interaction.created_at - last_use).total_seconds() < cooldown:
-                rules_not_satisfied_msg += '- Już pingnąłeś tę rolę niedawno. ⏱️\n'
-                continue
-            else:
-              last_use = database.data.get('ping_role_rule_last_use', {}).get(rule['id'])
-              if last_use is not None and (interaction.created_at - last_use).total_seconds() < cooldown:
-                rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę rolę. ⏱️\n'
-                continue
+            last_use = database.data.get('ping_role_rule_last_use', {}).get(rule['id'])
+            if last_use is not None:
+              match rule['cooldown_subject']:
+                case 'user':
+                  last_use = last_use.get(interaction.user.id)
+                case 'role':
+                  last_use = last_use.get(role.id)
+                case x:
+                  assert x is None
+            if last_use is not None and (interaction.created_at - last_use).total_seconds() < parse_duration(rule['cooldown']):
+              match rule['cooldown_subject']:
+                case 'user':
+                  rules_not_satisfied_msg += '- Już pingnąłeś tę rolę niedawno. ⏱️\n'
+                case 'role':
+                  rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę rolę. ⏱️\n'
+                case None:
+                  rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę grupę ról. ⏱️\n'
+              continue
 
             is_authorized = True
             authorizing_rule = rule
@@ -84,18 +91,25 @@ async def setup(_bot):
         if not role.mentionable and not interaction.app_permissions.mention_everyone:
           await interaction.response.send_message(f'Nie mam uprawnień, żeby spingować {role.mention}… 🧐', ephemeral=True)
           return
+        new_msg_content = f'{role.mention} {msg.content}\n-# Wysłane przez {interaction.user.mention}'
+        if len(new_msg_content) > 2000:
+          await interaction.response.send_message('Twoja wiadomość jest zbyt długa, żebym mógł coś do niej dopisać… 😔', ephemeral=True)
+          return
         new_msg = await msg.channel.send(
-          f'{role.mention} {msg.content}\n-# Wysłane przez {interaction.user.mention}',
+          new_msg_content,
           files=await asyncio.gather(*(i.to_file(use_cached=True) for i in msg.attachments)),
           allowed_mentions=discord.AllowedMentions(roles=[role]),
         )
 
         database.data.setdefault('ping_role_last_use', {})[interaction.user.id] = new_msg.created_at
         if authorizing_rule is not None:
-          if authorizing_rule['cooldown_is_per_user']:
-            database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[interaction.user.id] = new_msg.created_at
-          else:
-            database.data.setdefault('ping_role_rule_last_use', {})[authorizing_rule['id']] = new_msg.created_at
+          match authorizing_rule['cooldown_subject']:
+            case 'user':
+              database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[interaction.user.id] = new_msg.created_at
+            case 'role':
+              database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[role.id] = new_msg.created_at
+            case None:
+              database.data.setdefault('ping_role_rule_last_use', {})[authorizing_rule['id']] = new_msg.created_at
         database.should_save = True
 
         try:

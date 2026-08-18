@@ -51,12 +51,20 @@ async def setup(bot):
       bot.tree.walk_commands(guild=discord.Object(config['guild'])),
     )), key=lambda x: x.qualified_name)
     for cmd in cmds:
-        append('- `/' + ' '.join([cmd.qualified_name] + [f'<{i.name}>' if i.required else f'[{i.name}]' for i in cmd.parameters]) + f'` - {cmd.description}\n')
+      append('- `/' + ' '.join([cmd.qualified_name] + [f'<{i.display_name}>' if i.required else f'[{i.display_name}]' for i in cmd.parameters]) + f'` - {cmd.description}\n')
 
-    append('Komendy dostępne w zakładce "Aplikacje" po kliknięciu prawym przyciskiem myszy na użytkownika: 🖱️\n')
+    append('Komendy dostępne w zakładce "Aplikacje" po kliknięciu prawym przyciskiem myszy na użytkownika: 👤\n')
     cmds = sorted(filter(is_available, chain(
       bot.tree.walk_commands(type=discord.AppCommandType.user),
       bot.tree.walk_commands(type=discord.AppCommandType.user, guild=discord.Object(config['guild'])),
+    )), key=lambda x: x.qualified_name)
+    for cmd in cmds:
+      append(f'- {cmd.name}\n')
+
+    append('Komendy dostępne w zakładce "Aplikacje" po kliknięciu prawym przyciskiem myszy na wiadomość: 💬\n')
+    cmds = sorted(filter(is_available, chain(
+      bot.tree.walk_commands(type=discord.AppCommandType.message),
+      bot.tree.walk_commands(type=discord.AppCommandType.message, guild=discord.Object(config['guild'])),
     )), key=lambda x: x.qualified_name)
     for cmd in cmds:
       append(f'- {cmd.name}\n')
