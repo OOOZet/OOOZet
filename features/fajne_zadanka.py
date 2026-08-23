@@ -54,18 +54,22 @@ async def find_problem(url):
     if (match := re.fullmatch('/(?:contest|gym)/([0-9]+)/problem/([A-Za-z0-9]+)', path)) or \
        (match := re.fullmatch('/problemset/problem/([0-9]+)/([A-Za-z0-9]+)', path)):
       contest = int(match[1])
+      is_gym = contest > 100000
       letter = match[2].upper()
-      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}', middlewares=[codeforces_auth_middleware])
+      # Codeforces returns 400 Bad Request if you authorize yourself when you don't need to.
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}', middlewares=[codeforces_auth_middleware] if is_gym else [])
       return (
-        'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}/problem/{letter}',
+        'https://codeforces.com/' + ('gym' if is_gym else 'contest') + f'/{contest}/problem/{letter}',
         next(i['name'] for i in json['result']['problems'] if i['index'] == letter),
       )
 
     elif match := re.match('/(?:contest|gym)/([0-9]+)', path):
       contest = int(match[1])
-      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}', middlewares=[codeforces_auth_middleware])
+      is_gym = contest > 100000
+      # Codeforces returns 400 Bad Request if you authorize yourself when you don't need to.
+      json = await fetch_json(f'https://codeforces.com/api/contest.standings?contestId={contest}', middlewares=[codeforces_auth_middleware] if is_gym else [])
       return (
-        'https://codeforces.com/' + ('contest' if contest <= 100000 else 'gym') + f'/{contest}',
+        'https://codeforces.com/' + ('gym' if is_gym else 'contest') + f'/{contest}',
         json['result']['contest']['name'],
       )
 

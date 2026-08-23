@@ -111,7 +111,7 @@ async def setup(_bot):
 
   async def purge_everywhere(interaction, user):
     async def on_submit(interaction2):
-      await interaction2.response.defer()
+      await interaction2.response.defer(thinking=True, ephemeral=True)
       max_age = select.values[0]
 
       logging.info(f"{interaction.user.id} requested to purge {user.id}'s messages younger than {max_age} everywhere in guild {interaction.guild.id}")
