@@ -1,5 +1,6 @@
 aiohttp ~= 3.12
 beautifulsoup4
+lxml
 defusedxml
 discord.py ~= 2.3
 emoji ~= 2.5
