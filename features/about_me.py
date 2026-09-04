@@ -87,7 +87,7 @@ async def setup(bot):
 
   @bot.tree.command(description='Dziękuje istotnym twórcom bota')
   async def credits(interaction):
-    ids = [671790729676324867, 386516541790748673, 536253933778370580]
+    ids = [536253933778370580, 692105811270303785]
     contributors = ', '.join(f'<@{i}>' for i in ids)
     await interaction.response.send_message(
       f'OOOZet powstał dzięki wspólnym staraniom {contributors} i innych. [Ty też możesz znaleźć się wśród tego nielicznego grona!](https://github.com/OOOZet/OOOZet) 🙂',

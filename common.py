@@ -74,6 +74,14 @@ config = {
   ],
   'websub_timeout': '1m',                    # Maksymalny czas oczekiwania na subskrypcję i weryfikację subskrypcji
 
+  'oij_channel': None,                       # Kanał, na który są wysyłane ogłoszenia OIJ
+  'oij_role': None,                          # Rola pingowana przy nowych ogłoszeniach OIJ
+  'oij_poll_rate': '5m',                     # Częstotliwość sprawdzania ogłoszeń OIJ
+
+  'oi_channel': None,                        # Kanał, na który są wysyłane ogłoszenia OI
+  'oi_role': None,                           # Rola pingowana przy nowych ogłoszeniach OI
+  'oi_poll_rate': '5m',                      # Częstotliwość sprawdzania ogłoszeń OI
+
   'oki_channel': None,                       # Kanał, na który są wysyłane ogłoszenia o transmisjach na żywo i nowych filmach OKI
   'oki_role': None,                          # Rola, która jest pingowana przy każdym ogłoszeniu o nowym filmie lub transmisji
   'oki_youtube': 'UCw1Z4iA0T-QNaJ-sEOXeYCw', # ID (a nie nazwa użytkownika) kanału YouTube
