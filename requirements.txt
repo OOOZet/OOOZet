@@ -1,7 +1,8 @@
-aiohttp ~= 3.12
+aiohttp ~= 3.12 # Middlewares
 beautifulsoup4
+brotli ~= 1.2 # qoj.ac, https://github.com/advisories/GHSA-6mq8-rvhq-8wgg
 defusedxml
-discord.py ~= 2.3
-emoji ~= 2.5
+-e ./discord.py/ > 2.7.1, == 2.* # https://github.com/Rapptz/discord.py/commit/026a882d526f04421c05951a91ada237a05d287c
+emoji ~= 2.5 # emoji.analyze
 python-dateutil
 requests

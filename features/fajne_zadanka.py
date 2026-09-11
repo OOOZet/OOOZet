@@ -38,7 +38,10 @@ async def codeforces_auth_middleware(request, handler):
   return await handler(request)
 
 async def fetch_html(*args, **kwargs):
-  async with aiohttp.ClientSession(raise_for_status=True) as session:
+  headers = { # qoj.ac recently started to 403 our requests. This is our workaround.
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; en-US; rv:11.0) like Gecko',
+  }
+  async with aiohttp.ClientSession(headers=headers, raise_for_status=True) as session:
     return BeautifulSoup(await (await session.get(*args, **kwargs)).text(), 'lxml')
 
 async def fetch_json(*args, **kwargs):

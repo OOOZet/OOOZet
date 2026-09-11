@@ -219,6 +219,7 @@ def view_for(sugestia):
       for button in view.children:
         button.disabled = True
 
+  # TODO: show this as a modal?
   async def on_describe(interaction):
     url = mention_message(bot, sugestia['channel'], sugestia['id'])
     result = f'## Sugestia {url}\n'

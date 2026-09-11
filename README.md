@@ -4,12 +4,15 @@ Bot serwera [OKI OI OIJ Zjednoczenie](https://discord.gg/AMGxG4TvDS) do spełnia
 
 ## Instalacja
 
-1. Upewnij się, że masz zainstalowanego Pythona 3.
-2. Zainstaluj potrzebne biblioteki przy użyciu `pip3 install -r requirements.txt`.
-3. Wsadź token swojego bota do `config.json`.
-4. Ustaw inne dostępne opcje w `config.json` wedle uznania, listę których możesz znaleźć w [`common.py`](common.py#L23).
-5. Odpal `./main.py` lub `./main.py -c <path to config>`.
-6. Smacznego.
+1. Sklonuj repozytorium za pomocą `git clone --depth 1 --recurse-submodules https://github.com/OOOZet/OOOZet`.
+2. Upewnij się, że masz zainstalowanego Pythona 3.
+3. Stwórz wirtualne środowisko za pomocą `python3 -m venv ./venv/`, żeby nie psuć sobie pakietów systemowych.
+4. Aktywuj je: `source ./venv/bin/activate`. **Od teraz musisz wykonywać tę komendę w każdej nowej sesji powłoki systemowej.**
+5. Zainstaluj potrzebne biblioteki przy użyciu `pip3 install -r requirements.txt`.
+6. Wsadź token swojego bota do `config.json`.
+7. Ustaw inne dostępne opcje w `config.json` wedle uznania, listę których możesz znaleźć w [`common.py`](common.py#L23).
+8. Odpal `./main.py` lub `./main.py -c <path to config>`.
+9. Smacznego.
 
 Domyślnie bot będzie zapisywał swoje dane w `database.json`, a jego konsola będzie otwarta na porcie 2341, do której możesz się podłączyć za pomocą `telnet localhost 2341`.
 

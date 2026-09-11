@@ -1,0 +1,4 @@
+[submodule "discord.py"]
+	path = discord.py
+	url = https://github.com/Rapptz/discord.py
+	shallow = true
