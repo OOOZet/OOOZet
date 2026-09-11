@@ -21,7 +21,7 @@ from dateutil.relativedelta import relativedelta
 from zoneinfo import ZoneInfo
 
 import console, database
-from common import config, debacktick, format_datetime, limit_len, mention_date, mention_datetime, pages_view, select_view
+from common import config, debacktick, format_datetime, limit_len, mention_date, mention_datetime, mention_message, pages_view, select_view
 from features.utils import check_staff, is_staff
 
 warn_expiration_is_enabled = True
@@ -88,7 +88,12 @@ async def setup(_bot):
 
     do_expires(user.id)
     count = sum(not warn['expired'] for warn in warns_of(user.id))
-    await interaction.response.send_message(f'{user.mention} właśnie dostał swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
+    reply = await interaction.response.send_message(f'{user.mention} właśnie dostał swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}`! 😒', allowed_mentions=discord.AllowedMentions.all())
+    msg = mention_message(bot, interaction.channel_id, reply.message_id)
+    try:
+      await user.send(f'Właśnie dostałeś swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}` na {msg}! 😒')
+    except discord.Forbidden:
+      logging.warn(f'Cannot send warn notification to user {user.id}')
 
   @bot.tree.command(name='warn', description='Ostrzega użytkownika')
   @discord.app_commands.guilds(config['guild'])
