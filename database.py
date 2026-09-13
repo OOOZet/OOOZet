@@ -14,6 +14,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# TODO: switch to rapidjson
+# IDEA: "json models" as a sort of wrapper around raw json data, with fancy attribute setter/getter magic methods?
+
 import json, logging, os, shutil, threading
 from datetime import date, datetime
 

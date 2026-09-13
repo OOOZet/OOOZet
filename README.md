@@ -7,12 +7,11 @@ Bot serwera [OKI OI OIJ Zjednoczenie](https://discord.gg/AMGxG4TvDS) do spełnia
 1. Sklonuj repozytorium za pomocą `git clone --depth 1 --recurse-submodules https://github.com/OOOZet/OOOZet`.
 2. Upewnij się, że masz zainstalowanego Pythona 3.
 3. Stwórz wirtualne środowisko za pomocą `python3 -m venv ./venv/`, żeby nie psuć sobie pakietów systemowych.
-4. Aktywuj je: `source ./venv/bin/activate`. **Od teraz musisz wykonywać tę komendę w każdej nowej sesji powłoki systemowej.**
-5. Zainstaluj potrzebne biblioteki przy użyciu `pip3 install -r requirements.txt`.
-6. Wsadź token swojego bota do `config.json`.
-7. Ustaw inne dostępne opcje w `config.json` wedle uznania, listę których możesz znaleźć w [`common.py`](common.py#L23).
-8. Odpal `./main.py` lub `./main.py -c <path to config>`.
-9. Smacznego.
+4. Zainstaluj potrzebne biblioteki przy użyciu `./venv/bin/pip3 install -r requirements.txt`.
+5. Wsadź token swojego bota do `config.json`.
+6. Ustaw inne dostępne opcje w `config.json` wedle uznania, listę których możesz znaleźć w [`common.py`](common.py#L29).
+7. Odpal `./venv/bin/python3 main.py` z opcjonalną opcją `-c <ścieżka do configu>`.
+8. Smacznego.
 
 Domyślnie bot będzie zapisywał swoje dane w `database.json`, a jego konsola będzie otwarta na porcie 2341, do której możesz się podłączyć za pomocą `telnet localhost 2341`.
 
@@ -26,3 +25,7 @@ W głównym folderze znajduje się szkielet bota, który raczej nie będziesz mu
 - [`main.py`](main.py) - Punkt wejściowy programu. Nie robi nic więcej jak zainicjalizowanie innych modułów.
 
 Cała realna funkcjonalność bota jest trzymana w folderze [`features`](features/). Na początku pliku [`misc.py`](features/misc.py) znajdują się dwie funkcje, które mogą się okazać ciekawe, jeśli masz w planach, żeby bot automatycznie nadawał użytkownikom jakieś role.
+
+Podczas programowania przydatnymi mogą się też okazać:
+- Opcja `--dev`, która wyłącza powolną synchronizację listy komend bota z serwerami Discorda.
+- Komenda `source ./venv/bin/activate`, dzięki której nie trzeba pisać `./venv/bin/` przed komendami Pythona.

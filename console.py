@@ -30,7 +30,7 @@ def start():
   global server
   server = socket.socket()
   server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-  server.bind((config['console_host'], config['console_port']))
+  server.bind((config['console_host'], config['console_port'])) # TODO: we shouldn't even allow opening this to the greater internet
   server.listen(1)
 
   global thread
@@ -57,6 +57,7 @@ def stop():
 
 client = None
 
+# TODO: do we really want to play cat and mouse with all these specific exceptions?
 def listen():
   global should_stop_listen
   should_stop_listen = False

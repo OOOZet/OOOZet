@@ -181,6 +181,7 @@ async def setup(_bot):
   atcoder = discord.app_commands.Group(name='atcoder', description='Komendy do nicków na AtCoder')
   bot.tree.add_command(atcoder)
 
+  # TODO: handle stealing others' handles properly
   @atcoder.command(name='set', description='Zapamiętuje twój nick na AtCoder')
   async def set_(interaction, handle: str):
     logging.info(f'{interaction.user.id} requested to set their AtCoder handle to {handle!r}')

@@ -1,6 +1,5 @@
-aiohttp ~= 3.12 # Middlewares
+aiohttp [speedups] ~= 3.12 # Middlewares. Brotli for qoj.ac.
 beautifulsoup4 [lxml]
-brotli ~= 1.2 # qoj.ac, https://github.com/advisories/GHSA-6mq8-rvhq-8wgg
 defusedxml
 -e ./discord.py/ > 2.7.1, == 2.* # https://github.com/Rapptz/discord.py/commit/026a882d526f04421c05951a91ada237a05d287c
 emoji ~= 2.5 # emoji.analyze

@@ -16,6 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# TODO: move all source code to src/
+# IDEA: a proper feature system with dependency resolving, controlled
+#       inter-feature communication, decorators for class-level definitions
+#       of console commands and check failure handlers, and automatic
+#       registration of tree commands and startup of loops
+
 import discord, sys
 
 import bot, common, console, database
@@ -32,8 +38,8 @@ if __name__ == '__main__':
         options['config'] = args[i]
       except IndexError:
         raise Exception(f'Expected a path to config after {args[i - 1]!r}')
-    elif args[i] == '--debug':
-      options['debug'] = True
+    elif args[i] == '--dev':
+      options['dev'] = True
     else:
       raise Exception(f'Unknown option: {args[i]!r}')
     i += 1

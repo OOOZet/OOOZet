@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 options = {
   'config': 'config.json',
-  'debug': False,
+  'dev': False,
 }
 
 config = {
@@ -83,7 +83,8 @@ config = {
   'codeforces_channel': None,                # Kanał, na który są wysyłane przypomnienia o rundach na Codeforces
   'codeforces_role': None,                   # Rola, która jest pingowana w przypomnieniach o rundach
   'codeforces_advance': '15m',               # Wyprzedzenie, z którym są wysyłane przypomnienia o rundach
-  'codeforces_poll_rate': '1h',              # Częstotliwość aktualizowania listy rund
+  'codeforces_contest_poll_rate': '1h',      # Częstotliwość aktualizowania listy rund
+  'codeforces_problemset_poll_rate': '1d',   # Częstotliwość aktualizowania zbioru zadań
   'codeforces_api_lag': '1m',                # Maksymalny czas przetwarzania aktualizacji danych przez Codeforces
   'codeforces_api_key': None,                # Pole "key" klucza do API Codeforces
   'codeforces_api_secret': None,             # Pole "secret" klucza do API Codeforces
@@ -142,6 +143,22 @@ config = {
       'unlocked_roles': []                   # Role, które ta zasada odblokowuje. Jeśli wybrana rola jest w tej liście i powyższe warunki są spełnione, zasada zostaje użyta i sprawdzanie pozwolenia na ping zostaje zakończone powodzeniem.
     }
   ],
+
+  'lockout_taskc_choices': [1, 3, 4, 5, 6],  # Możliwe wybory liczby zadań w pojedynku w lockout
+  'lockout_duration_choices': [              # Możliwe wybory czasu trwania pojedynku
+    ['15 minut', '15m'],
+    ['30 minut', '30m'],
+    ['1 godzina', '1h'],
+    ['1.5 godziny', '1h30m'],
+    ['2 godziny', '2h'],
+  ],
+  'lockout_min_rating_default': 800,         # Domyślna minimalna trudność zadania w pojedynku
+  'lockout_max_rating_default': 1800,        # Domyślna maksymalna trudność zadania w pojedynku
+  'lockout_contest_whitelist': [             # Słowa klucz, które muszą się znaleźć w tytule rundy, aby jej zadania weszły w pulę losowania
+    'Round', 'Hello', 'Good Bye', 'Rated',
+  ],
+  'lockout_invite_timeout': '3m',            # Czas, w którym wyzwanie musi zostać zaakceptowane. Czas ten jest też ograniczony z góry przez Discord.
+  'lockout_refresh_cooldown': '30s',         # Odstęp czasu, po którym można ponownie odświeżyć widok pojedynku
 }
 
 def redacted_config():

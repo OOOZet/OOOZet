@@ -14,12 +14,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging, random, string
+import aiohttp, asyncio, discord, logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import console, database
 from common import config, log_exceptions, loop, mention_datetime, parse_duration
+from features.codeforces_handles import get_handle
 
 bot = None
 
@@ -116,11 +117,10 @@ async def send_national_standings(contest):
 
     for user, old_handle in old_user_handles.items():
       new_handle = user_infos[old_handle]['handle']
-      if new_handle == old_handle or database.data['codeforces_handles'].get(user) != old_handle:
+      if new_handle == old_handle or get_handle(user) != old_handle:
         continue
       logging.info(f"Updating {user}'s Codeforces handle from {old_handle!r} to {new_handle!r}")
-      database.data['codeforces_handles'][user] = new_handle
-      database.should_save = True
+      set_handle(user, new_handle)
 
   lines = []
 
@@ -193,7 +193,7 @@ async def setup(_bot):
   reminders = []
   watchlist = set()
 
-  @loop(interval=config['codeforces_poll_rate'])
+  @loop(interval=config['codeforces_contest_poll_rate'])
   async def poll():
     logging.info('Periodically downloading Codeforces contest list')
 
@@ -227,91 +227,6 @@ async def setup(_bot):
           watchlist.remove(contest.id)
 
   poll.start()
-
-  codeforces = discord.app_commands.Group(name='codeforces', description='Komendy do nicków na Codeforces')
-  bot.tree.add_command(codeforces)
-
-  @codeforces.command(name='set', description='Zapamiętuje twój nick na Codeforces')
-  async def set_(interaction, handle: str):
-    logging.info(f'{interaction.user.id} requested to set their Codeforces handle to {handle!r}')
-
-    if any(i not in string.ascii_letters + string.digits + '-._' for i in handle):
-      await interaction.response.send_message('Taki nick zawiera niedozwolone znaki… 🤨', ephemeral=True)
-      return
-
-    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
-      json = await (await session.get('user.info', params={'handles': handle, 'checkHistoricHandles': 'false'})).json()
-    if 'not found' in json.get('comment', ''):
-      await interaction.response.send_message('Nie ma na Codeforces konta o takim nicku… 🤨', ephemeral=True)
-      return
-
-    a = random.choice(['Agent', 'Legenda', 'Mistrz', 'Pogromca', 'Przyjaciel', 'Zaklinacz', 'Zbawiciel', 'Zjadacz'])
-    b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
-
-    # U+202F is not a word break and allows both words to be selected at once.
-    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True)
-    await asyncio.sleep(3 * 60)
-
-    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
-      json = await (await session.get('user.info', params={'handles': handle, 'checkHistoricHandles': 'false'})).json()
-    if json['status'] != 'OK':
-      raise Exception(f'Codeforces user info verification request failed: {json["comment"]!r}')
-    user_info = json['result'][0]
-    handle = user_info['handle']
-    first = user_info.get('firstName')
-    last = user_info.get('lastName')
-
-    x = ''.join((first or '').split())
-    y = ''.join((last or '').split())
-    if x == a + b:
-      success = ''
-    elif y == a + b:
-      success = '-# Psst… Miałeś ustawić swoje *imię*, a nie nazwisko. 😉'
-    elif x + y == a + b:
-      success = '-# Psst… Gratuluję bycia na tyle mądrym, żeby rodzielić hasło weryfikacyjne na imię i nazwisko, mimo iż polecenie kazało ustawić samo imię. 😌'
-    else:
-      success = None
-
-    if success is not None:
-      logging.info(f'{interaction.user.id} has successfully set their Codeforces handle to {handle!r}')
-      database.data.setdefault('codeforces_handles', {})[interaction.user.id] = handle
-      database.should_save = True
-      await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na Codeforces na `{handle}`! 🥳\n{success}')
-    else:
-      logging.info(f'{interaction.user.id} failed to verify their Codeforces handle ({first!r} & {last!r} != {a!r} & {b!r})')
-      if first is None:
-        read = 'end of file'
-      elif '`' in first:
-        read = 'stringa z grawisami (*ty hakierze*)'
-      else:
-        read = f'`{first}`'
-      await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. Oczekiwano `{a} {b}`, wczytano {read}. 😕')
-
-  async def get(interaction, user):
-    handle = database.data.get('codeforces_handles', {}).get(user.id)
-    if handle is None:
-      await interaction.response.send_message(f'{user.mention} nie podzielił się jeszcze swoim nickiem na Codeforces. 🕵️', ephemeral=True)
-    else:
-      await interaction.response.send_message(f'{user.mention} ma nick [`{handle}`](https://codeforces.com/profile/{handle}) na Codeforces. 🕵️', ephemeral=True, suppress_embeds=True)
-
-  @codeforces.command(name='get', description='Pokazuje nick użytkownika na Codeforces')
-  async def cmd_get(interaction, user: discord.User | None):
-    await get(interaction, interaction.user if user is None else user)
-
-  @bot.tree.context_menu(name='Pokaż nick na Codeforces')
-  async def menu_get(interaction, user: discord.User):
-    await get(interaction, user)
-
-  @codeforces.command(description='Zapomina twój nick na Codeforces')
-  async def unset(interaction):
-    try:
-      del database.data['codeforces_handles'][interaction.user.id]
-      database.should_save = True
-    except KeyError:
-      await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na Codeforces… 🤨', ephemeral=True)
-    else:
-      logging.info(f'{interaction.user.id} has unset their Codeforces handle')
-      await interaction.response.send_message('Pomyślnie zapomniano twój nick na Codeforces. 🫡', ephemeral=True)
 
 async def send_standings(contest_id):
   async with aiohttp.ClientSession('https://codeforces.com/api/') as session:

@@ -18,10 +18,8 @@ import asyncio, discord, discord.ext.commands, logging, random, threading
 
 import console
 from common import config, options
-from features import about_me, budzik, counting, fajne_zadanka, help_forum, misc, moderation, ping_guard, rules, sugestie, utils, warns, xp
+from features import about_me, budzik, codeforces_handles, counting, fajne_zadanka, help_forum, lockout, misc, moderation, ping_guard, rules, sugestie, utils, warns, xp
 from features.reminders import atcoder, codeforces, youtube
-
-# TODO: lockout
 
 class Client(discord.ext.commands.Bot):
   async def setup_hook(self):
@@ -29,9 +27,11 @@ class Client(discord.ext.commands.Bot):
     await atcoder.setup(self)
     await budzik.setup(self)
     await codeforces.setup(self)
+    await codeforces_handles.setup(self)
     await counting.setup(self)
     await fajne_zadanka.setup(self)
     await help_forum.setup(self)
+    await lockout.setup(self)
     await misc.setup(self)
     await moderation.setup(self)
     await ping_guard.setup(self)
@@ -42,7 +42,7 @@ class Client(discord.ext.commands.Bot):
     await xp.setup(self)
     await youtube.setup(self)
 
-    if not options['debug']:
+    if not options['dev']:
       await self.tree.sync()
       await self.tree.sync(guild=discord.Object(config['guild']))
 
