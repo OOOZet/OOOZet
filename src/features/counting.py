@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, logging
+import asyncio
 from datetime import datetime
 from discord import app_commands
 
@@ -44,7 +44,7 @@ async def clean():
     return
 
   if 'counting_clean_until' not in database.data:
-    logging.info('#counting has never been cleaned before')
+    log.info('#counting has never been cleaned before')
     database.data['counting_clean_until'] = datetime.now().astimezone()
     database.should_save = True
 
@@ -58,9 +58,9 @@ async def clean():
       else:
         if num == database.data.get('counting_num', num) and not msg.author.bot:
           if 'counting_num' in database.data:
-            logging.info(f'{msg.author.id} has upped the counting number to {num}')
+            log.info(f'{msg.author.id} has upped the counting number to {num}')
           else:
-            logging.info(f'{msg.author.id} has called the initial counting number at {num}')
+            log.info(f'{msg.author.id} has called the initial counting number at {num}')
 
           database.data['counting_num'] = num + 1
           database.data['counting_clean_until'] = msg.created_at
@@ -72,14 +72,14 @@ async def clean():
 
 @event_listener
 async def on_ready():
-  logging.info('Cleaning #counting')
+  log.info('Cleaning #counting')
   await clean()
-  logging.info('Counting is ready')
+  log.info('Counting is ready')
 
 @event_listener
 async def on_message(msg):
   if msg.channel.id == config['counting_channel']:
-    logging.info('Cleaning #counting after a new message')
+    log.info('Cleaning #counting after a new message')
     await clean() # on_message can come before on_ready.
 
 @app_commands.command(description='Wyświetla ranking kanału #liczenie')
@@ -112,13 +112,13 @@ async def on_message_delete(msg):
   if msg.channel.id == config['counting_channel']:
     async with lock:
       if msg.id not in bad_messages: # We have no other way of checking if we caused this event.
-        logging.info(f'{msg.author.id} deleted their message in #counting')
+        log.info(f'{msg.author.id} deleted their message in #counting')
         database.data['counting_score'][msg.author.id] -= 1
         database.should_save = True
 
 @console.operation(desc='recalculates the counting ranking')
 async def recalc():
-  logging.info('Recalculating the counting ranking')
+  log.info('Recalculating the counting ranking')
   async with lock:
     database.data['counting_score'] = {}
     async for msg in bot.get_channel(config['counting_channel']).history(limit=None):

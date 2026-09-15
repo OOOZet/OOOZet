@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging, random
+import aiohttp, asyncio, discord, random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from discord import app_commands
@@ -109,7 +109,7 @@ def duel_view(duel):
         return
     duel['last_update'] = datetime.now().astimezone()
 
-    logging.info(f'{interaction.user.id} requested to update duel between {duel["players"]}')
+    log.info(f'{interaction.user.id} requested to update duel between {duel["players"]}')
     await interaction.response.defer(thinking=True, ephemeral=True)
     await update_duel(duel)
     await interaction.delete_original_response()
@@ -119,7 +119,7 @@ def duel_view(duel):
       await interaction.response.send_message('Ten pojedynek już się zakończył… 🤨', ephemeral=True)
       return
 
-    logging.info(f'{interaction.user.id} aborted lockout duel between {duel["players"]}')
+    log.info(f'{interaction.user.id} aborted lockout duel between {duel["players"]}')
     duel['aborted'] = duel['players'].index(interaction.user.id)
     duel['end'] = interaction.created_at
     database.data['lockout_duels'].remove(duel)
@@ -187,7 +187,7 @@ async def get_duel_players_submissions(duel):
 
 # HACK: how to handle AC submissions from before the duel started?
 async def update_duel(duel):
-  logging.info(f'Updating lockout duel between {duel["players"]}')
+  log.info(f'Updating lockout duel between {duel["players"]}')
   duel['last_update'] = datetime.now().astimezone()
 
   try:
@@ -231,7 +231,7 @@ async def update_duel(duel):
 @log_exceptions
 async def time_duel_update(duel):
   time = duel['end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
-  logging.info(f'Waiting until {time} to update lockout duel between {duel["players"]}')
+  log.info(f'Waiting until {time} to update lockout duel between {duel["players"]}')
   await sleep_until(time)
   await update_duel(duel)
 
@@ -262,7 +262,7 @@ class Invite:
   async def finish_interaction(self):
     async with lock:
       check_invite_preconditions(self.interaction, self.invitee)
-      logging.info(f'{self.inviter.id} challenged {self.invitee.id} to a lockout duel')
+      log.info(f'{self.inviter.id} challenged {self.invitee.id} to a lockout duel')
       invites.append(self)
 
     try:
@@ -301,7 +301,7 @@ class Invite:
 
   # We allow a player to accept multiple duels at a time for extra fun.
   async def accept(self, interaction):
-    logging.info(f'{self.invitee.id} accepted lockout duel from {self.inviter.id}')
+    log.info(f'{self.invitee.id} accepted lockout duel from {self.inviter.id}')
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     duel = {
@@ -359,12 +359,12 @@ class Invite:
   @log_exceptions
   async def time_update(self):
     time = self.timeout_time + timedelta(seconds=5) # 5 seconds to make sure the if passes.
-    logging.info(f'Waiting until {time} to update lockout invite from {self.inviter.id} to {self.invitee.id}')
+    log.info(f'Waiting until {time} to update lockout invite from {self.inviter.id} to {self.invitee.id}')
     await sleep_until(time)
     await self.update()
 
   async def update(self):
-    logging.info(f'Updating lockout invite from {self.inviter.id} to {self.invitee.id}')
+    log.info(f'Updating lockout invite from {self.inviter.id} to {self.invitee.id}')
     if datetime.now().astimezone() >= self.timeout_time:
       invites.remove(self)
       await self.interaction.edit_original_response(content=f'{self.invitee.mention} nie przyjął twojego wyzwania… 😔')
@@ -403,7 +403,7 @@ async def on_ready():
         bot.add_view(view, message_id=msg)
     if 'last_update' not in duel or duel['last_update'] <= duel['end']:
       asyncio.create_task(time_duel_update(duel))
-  logging.info('Lockout is ready')
+  log.info('Lockout is ready')
 
 lockout = app_commands.Group(name='lockout', description='Komendy do lockouta')
 
@@ -460,16 +460,16 @@ async def menu_challenge(interaction, user: discord.User):
 
 @loop(interval=config['codeforces_problemset_poll_rate'])
 async def poll():
-  logging.info('Periodically downloading Codeforces problemset and contest list')
+  log.info('Periodically downloading Codeforces problemset and contest list')
 
   async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
     json = await (await session.get('problemset.problems')).json()
     contests = await (await session.get('contest.list')).json()
   if json['status'] != 'OK':
-    logging.error(f'Codeforces problemset request failed: {json["comment"]!r}')
+    log.error(f'Codeforces problemset request failed: {json["comment"]!r}')
     return
   if contests['status'] != 'OK':
-    logging.error(f'Codeforces contest list request failed: {contests["comment"]!r}')
+    log.error(f'Codeforces contest list request failed: {contests["comment"]!r}')
     return
 
   global filtered_problemset, problemset

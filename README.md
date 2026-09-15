@@ -20,16 +20,17 @@ Domyślnie bot będzie zapisywał swoje dane w `database.json`, a jego konsola b
 Cała realna funkcjonalność bota jest trzymana w folderze `features`. Każdy moduł w nim jest zwany "featurem". Do głównej klasy bota w [`bot.py`](src/bot.py) została dodana szczypta metaprogrammingu, aby uprościć tworzenie feature'ów poprzez automatyczną rejestrację tworzonych obiektów i wstrzykiwanie często używanych zmiennych. Poniżej chronologiczny opis procesu inicjalizacji bota:
 1. Funkcja main ładuje `config` i podstawowe moduły.
 2. Funkcja main importuje wszystkie feature'y. To jest późna pora na importowanie modułów w Pythonie, ale dzięki temu top-level kod w feature'ach ma dostęp do gotowego configa, a to jest potrzebne m.in. w definicjach komend ograniczonych do jednego guilda.
-1. Główna klasa bota wykrywa i zapamiętuje zaimportowane moduły z prefiksem `features.`.
-2. discord.py przygotowuje pętlę async i otwiera połączenie z Discordem.
-3. Do globalnego scope'u feature'ów wstrzykiwane są zmienne podane niżej.
-4. Zmienne globalne każdego z feature'ów są iterowane i wartości o typach podanych niżej są automatycznie rejestrowane.
-5. Wyemitowany zostaje event `setup`.
-6. Zarejestrowane dotąd komendy są synchronizowane z Discordem i rozpoczyna się normalna pętla wydarzeń.
+3. Główna klasa bota wykrywa i zapamiętuje zaimportowane moduły z prefiksem `features.`.
+4. Do globalnego scope'u feature'ów wstrzykiwane są zmienne podane niżej.
+5. discord.py przygotowuje pętlę async i otwiera połączenie z Discordem.
+6. Zmienne globalne każdego z feature'ów są iterowane i wartości o typach podanych niżej są automatycznie rejestrowane.
+7. Wyemitowany zostaje event `setup`.
+8. Zarejestrowane dotąd komendy są synchronizowane z Discordem i rozpoczyna się normalna pętla wydarzeń.
 
 Wstrzykiwane zmienne globalne:
 - `bot` - Referencja do głównej klasy bota
 - `feature_id` - Nazwa modułu bez prefiksu
+- `log` - Instancja `logging.Logger` z nazwą ustawioną na `feature_id`
 
 Automatycznie rejestrowane wartości w zmiennych globalnych:
 - `app_commands.Group`

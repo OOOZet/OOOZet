@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging, random, string
+import aiohttp, asyncio, discord, random, string
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -43,11 +43,11 @@ async def rate_limit_middleware(request, handler):
     if response.status != 429:
       return response
     seconds = int(response.headers['Retry-After'])
-    logging.info(f'Rate limited by {response.url.host}. Retrying in {seconds} seconds')
+    log.info(f'Rate limited by {response.url.host}. Retrying in {seconds} seconds')
     await asyncio.sleep(seconds)
 
 async def send_national_standings(contest):
-  logging.info(f'Sending national standings for AtCoder contest {contest.id}')
+  log.info(f'Sending national standings for AtCoder contest {contest.id}')
 
   if config['atcoder_channel'] is None:
     return
@@ -118,9 +118,9 @@ async def send_national_standings(contest):
 @log_exceptions
 async def remind(contest):
   time = contest.time - timedelta(seconds=parse_duration(config['atcoder_advance']))
-  logging.info(f'Setting reminder for AtCoder contest {contest.id} for {time}')
+  log.info(f'Setting reminder for AtCoder contest {contest.id} for {time}')
   await sleep_until(time)
-  logging.info(f'Reminding about AtCoder contest {contest.id}')
+  log.info(f'Reminding about AtCoder contest {contest.id}')
 
   if config['atcoder_channel'] is None:
     return
@@ -137,7 +137,7 @@ watchlist = set()
 
 @loop(interval=config['atcoder_poll_rate'])
 async def poll():
-  logging.info('Periodically downloading AtCoder contest schedule')
+  log.info('Periodically downloading AtCoder contest schedule')
 
   async with aiohttp.ClientSession(raise_for_status=True) as session:
     text = await (await session.get('https://atcoder.jp/contests/')).text()
@@ -160,14 +160,14 @@ async def poll():
     if datetime.now().astimezone() < contest.time - timedelta(seconds=parse_duration(config['atcoder_advance'])):
       reminders.append(asyncio.create_task(remind(contest)))
 
-      logging.info(f'Adding AtCoder contest {contest.id} to watchlist')
+      log.info(f'Adding AtCoder contest {contest.id} to watchlist')
       watchlist.add(contest.id)
 
     elif contest.id in watchlist:
       try:
         await send_national_standings(contest)
       except:
-        logging.exception('Got exception while sending AtCoder national standings')
+        log.exception('Got exception while sending AtCoder national standings')
       else:
         watchlist.remove(contest.id)
 
@@ -176,7 +176,7 @@ atcoder = app_commands.Group(name='atcoder', description='Komendy do nicków na 
 # TODO: handle stealing others' handles properly
 @atcoder.command(name='set', description='Zapamiętuje twój nick na AtCoder')
 async def set_(interaction, handle: str):
-  logging.info(f'{interaction.user.id} requested to set their AtCoder handle to {handle!r}')
+  log.info(f'{interaction.user.id} requested to set their AtCoder handle to {handle!r}')
 
   if any(i not in string.ascii_letters + string.digits + '_' for i in handle):
     await interaction.response.send_message('Taki nick zawiera niedozwolone znaki… 🤨', ephemeral=True)
@@ -206,12 +206,12 @@ async def set_(interaction, handle: str):
     read = None
 
   if read is not None and ''.join(read.split()) == a + b:
-    logging.info(f'{interaction.user.id} has successfully set their AtCoder handle to {handle!r}')
+    log.info(f'{interaction.user.id} has successfully set their AtCoder handle to {handle!r}')
     database.data.setdefault('atcoder_handles', {})[interaction.user.id] = handle
     database.should_save = True
     await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na AtCoder na `{handle}`! 🥳\n')
   else:
-    logging.info(f'{interaction.user.id} failed to verify their AtCoder handle ({read!r} != {a!r} & {b!r})')
+    log.info(f'{interaction.user.id} failed to verify their AtCoder handle ({read!r} != {a!r} & {b!r})')
     if read is None:
       read = 'end of file'
     elif '`' in read:
@@ -243,7 +243,7 @@ async def unset(interaction):
   except KeyError:
     await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na AtCoder… 🤨', ephemeral=True)
   else:
-    logging.info(f'{interaction.user.id} has unset their AtCoder handle')
+    log.info(f'{interaction.user.id} has unset their AtCoder handle')
     await interaction.response.send_message('Pomyślnie zapomniano twój nick na AtCoder. 🫡', ephemeral=True)
 
 @console.operation(desc='send the standings of Polish contestants in an AtCoder contest')

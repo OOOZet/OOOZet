@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, logging, random
+import discord, random
 from datetime import datetime
 from discord import app_commands
 
@@ -35,7 +35,7 @@ def check_staff_nonempty(interaction):
     raise NoStaffError()
 
 async def update_roles_for(member):
-  logging.info(f'Updating timeout role for {member.id}')
+  log.info(f'Updating timeout role for {member.id}')
   if config['timeout_role'] is not None:
     role = discord.Object(config['timeout_role'])
     if member.is_timed_out():
@@ -55,7 +55,7 @@ async def on_check_failure(interaction, error):
 async def fix_roles(interaction, member: discord.Member | None):
   if member is None:
     member = interaction.user
-  logging.info(f'Received user request to update roles for {member.id}')
+  log.info(f'Received user request to update roles for {member.id}')
   await interaction.response.defer(ephemeral=True)
   await xp.update_roles_for(member)
   await update_roles_for(member)
@@ -66,7 +66,7 @@ async def on_member_join(member):
   if member.guild.id != config['guild']:
     return
 
-  logging.info(f'{member.id} joined the guild')
+  log.info(f'{member.id} joined the guild')
   await xp.update_roles_for(member)
   await update_roles_for(member)
 
@@ -75,7 +75,7 @@ async def on_member_remove(member):
   if member.guild.id != config['guild']:
     return
 
-  logging.info(f'{member.id} left the guild')
+  log.info(f'{member.id} left the guild')
   if member.guild.system_channel_flags.join_notifications:
     announcement = random.choice([
       f'Niestety nie ma już `{member}` z nami… 🕯️',
@@ -97,7 +97,7 @@ async def alarm(interaction):
       await interaction.response.send_message(f'Alarm już zabrzmiał w ciągu ostatnich **{cooldown}** sekund. ⏱️', ephemeral=True)
       return
 
-  logging.info(f'{interaction.user.id} has raised the alarm!')
+  log.info(f'{interaction.user.id} has raised the alarm!')
   database.data['alarm_last'] = now
   database.should_save = True
 
@@ -121,10 +121,10 @@ async def on_member_update(before, after):
   if before.is_timed_out() != after.is_timed_out() and config['timeout_role'] is not None:
     role = discord.Object(config['timeout_role'])
     if after.is_timed_out():
-      logging.info(f'{after.id} has been timed out')
+      log.info(f'{after.id} has been timed out')
       await after.add_roles(role)
     else:
-      logging.info(f"{after.id}'s timeout has been manually removed")
+      log.info(f"{after.id}'s timeout has been manually removed")
       await after.remove_roles(role)
 
 @loop(interval=config['timeout_poll_rate'])
@@ -133,7 +133,7 @@ async def poll_timeouts():
     await bot.wait_until_ready()
     for member in bot.get_guild(config['guild']).get_role(config['timeout_role']).members:
       if not member.is_timed_out():
-        logging.info(f"{member.id}'s timeout has expired")
+        log.info(f"{member.id}'s timeout has expired")
         await member.remove_roles(discord.Object(config['timeout_role']))
 
 @event_listener
@@ -151,7 +151,7 @@ async def link(interaction, user1: discord.User, user2: discord.User):
   with database.lock:
     are_already_linked = user1.id in database.data.get('linked_users', {}).get(user2.id, [])
     if not are_already_linked:
-      logging.info(f'Linking users {user1.id} and {user2.id}')
+      log.info(f'Linking users {user1.id} and {user2.id}')
       clique1 = database.data.setdefault('linked_users', {}).setdefault(user1.id, []) + [user1.id]
       clique2 = database.data['linked_users'].setdefault(user2.id, []) + [user2.id]
       for i in clique1:
@@ -171,7 +171,7 @@ async def unlink(interaction, user: discord.User):
   with database.lock:
     is_already_unlinked = not database.data.get('linked_users', {}).get(user.id, [])
     if not is_already_unlinked:
-      logging.info(f'Unlinking user {user.id}')
+      log.info(f'Unlinking user {user.id}')
       for i in database.data['linked_users'][user.id]:
         database.data['linked_users'][i].remove(user.id)
       del database.data['linked_users'][user.id]

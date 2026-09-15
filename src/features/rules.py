@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, logging
+import discord
 from discord import app_commands
 from io import StringIO
 
@@ -166,7 +166,7 @@ async def set_(interaction, text: discord.Attachment, ile_sugestii: app_commands
     return
 
   async def on_submit(interaction2):
-    logging.info('Setting new rules')
+    log.info('Setting new rules')
     rules = {
       'time': interaction2.created_at,
       'text': text,

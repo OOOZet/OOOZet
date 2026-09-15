@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging, os, re
+import aiohttp, asyncio, discord, os, re
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -135,7 +135,7 @@ async def clean():
     return
 
   if 'fajne_zadanka_clean_until' not in database.data:
-    logging.info('#fajne-zadanka has never been cleaned before')
+    log.info('#fajne-zadanka has never been cleaned before')
     database.data['fajne_zadanka_clean_until'] = datetime.now().astimezone()
     database.should_save = True
 
@@ -171,7 +171,7 @@ async def clean():
       try:
         url, title = await find_problem(url) or (url, url)
       except:
-        logging.exception('Got exception while finding problem metadata')
+        log.exception('Got exception while finding problem metadata')
         title = url
 
       embed = discord.Embed(title=title, url=url, description=description)
@@ -186,14 +186,14 @@ async def clean():
 
 @event_listener
 async def on_ready():
-  logging.info('Cleaning #fajne-zadanka')
+  log.info('Cleaning #fajne-zadanka')
   await clean()
-  logging.info('Fajne zadanka is ready')
+  log.info('Fajne zadanka is ready')
 
 @event_listener
 async def on_message(msg):
   if msg.channel.id == config['fajne_zadanka_channel']:
-    logging.info('Cleaning #fajne-zadanka after a new message')
+    log.info('Cleaning #fajne-zadanka after a new message')
     await clean() # Same pattern as in counting.py
 
 @event_listener

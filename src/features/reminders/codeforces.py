@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging
+import aiohttp, asyncio, discord
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -45,7 +45,7 @@ class Contest:
     return all(i not in self.title for i in ['Round', 'Hello', 'Good Bye', 'Rated'])
 
 async def send_national_standings(contest):
-  logging.info(f'Sending national standings for Codeforces contest {contest.id}')
+  log.info(f'Sending national standings for Codeforces contest {contest.id}')
 
   if config['codeforces_channel'] is None:
     return
@@ -79,14 +79,14 @@ async def send_national_standings(contest):
     if json['status'] != 'OK':
       if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
         if should_be_rated:
-          logging.warning(f'Failed to detect an unrated contest: {contest}')
+          log.warning(f'Failed to detect an unrated contest: {contest}')
           should_be_rated = False
       else:
         raise Exception(f'Rating changes request failed: {json["comment"]!r}')
     elif not json['result'] and should_be_rated:
       raise Exception('Rating changes are not available yet')
     elif json['result'] and not should_be_rated:
-      logging.warning(f'Failed to detect a rated contest: {contest}')
+      log.warning(f'Failed to detect a rated contest: {contest}')
       should_be_rated = True
     rating_changes = {i['handle']: i for i in json.get('result', [])}
 
@@ -117,7 +117,7 @@ async def send_national_standings(contest):
       new_handle = user_infos[old_handle]['handle']
       if new_handle == old_handle or get_handle(user) != old_handle:
         continue
-      logging.info(f"Updating {user}'s Codeforces handle from {old_handle!r} to {new_handle!r}")
+      log.info(f"Updating {user}'s Codeforces handle from {old_handle!r} to {new_handle!r}")
       set_handle(user, new_handle)
 
   lines = []
@@ -170,9 +170,9 @@ async def send_national_standings(contest):
 
 @log_exceptions
 async def remind(contest, delay):
-  logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
+  log.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
   await asyncio.sleep(delay)
-  logging.info(f'Reminding about Codeforces contest {contest.id}')
+  log.info(f'Reminding about Codeforces contest {contest.id}')
 
   if config['codeforces_channel'] is None:
     return
@@ -189,12 +189,12 @@ watchlist = set()
 
 @loop(interval=config['codeforces_contest_poll_rate'])
 async def poll():
-  logging.info('Periodically downloading Codeforces contest list')
+  log.info('Periodically downloading Codeforces contest list')
 
   async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
     json = await (await session.get('contest.list')).json()
   if json['status'] != 'OK':
-    logging.error(f'Codeforces contest list request failed: {json["comment"]!r}')
+    log.error(f'Codeforces contest list request failed: {json["comment"]!r}')
     return
 
   for task in reminders:
@@ -210,13 +210,13 @@ async def poll():
         reminders.append(asyncio.create_task(remind(contest, delay)))
 
     if entry['phase'] != 'FINISHED':
-      logging.info(f'Adding Codeforces contest {contest.id} to watchlist')
+      log.info(f'Adding Codeforces contest {contest.id} to watchlist')
       watchlist.add(contest.id)
     elif contest.id in watchlist:
       try:
         await send_national_standings(contest)
       except:
-        logging.exception('Got exception while sending Codeforces national standings')
+        log.exception('Got exception while sending Codeforces national standings')
       else:
         watchlist.remove(contest.id)
 

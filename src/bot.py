@@ -17,11 +17,14 @@
 # TODO: anti-nuke
 # IDEA: download source code button
 
-import asyncio, discord, logging, random, sys, threading
+import asyncio, discord, random, sys, threading
 from discord import app_commands
+from logging import getLogger
 
 import console
 from common import config, log_exceptions, Loop, options
+
+log = getLogger(__name__)
 
 class Client(discord.Client):
   def __init__(self):
@@ -50,16 +53,21 @@ class Client(discord.Client):
       if not name.startswith('features.'):
         continue
       if mod.__spec__.origin is None:
-        logging.debug(f'Skipping namespace module {name!r}')
+        log.debug(f'Skipping namespace module {name!r}')
         continue
       self.features.append(mod)
+
+      assert not hasattr(mod, 'bot'), mod
+      mod.bot = self
       if not hasattr(mod, 'feature_id'):
         mod.feature_id = mod.__name__.removeprefix('features.')
+      if not hasattr(mod, 'log'):
+        mod.log = getLogger(mod.feature_id)
 
     if self.features:
-      logging.info(f'Found imported features: {sorted(i.feature_id for i in self.features)}')
+      log.info(f'Found imported features: {sorted(i.feature_id for i in self.features)}')
     else:
-      logging.warning('No imported features have been found')
+      log.warning('No imported features have been found')
 
   async def handle_error(self, interaction, error, log_msg):
     if isinstance(error, app_commands.CheckFailure):
@@ -69,9 +77,9 @@ class Client(discord.Client):
           return
         except Exception as new_error:
           if new_error is not error:
-            logging.exception(f'Got exception in check failure handler from {handler.__module__!r}')
+            log.exception(f'Got exception in check failure handler from {handler.__module__!r}')
 
-    logging.exception(log_msg)
+    log.exception(log_msg)
 
     send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
     emoji = random.choice(['😖', '🫠', '😵', '😵‍💫', '🥴'])
@@ -86,9 +94,6 @@ class Client(discord.Client):
     setup_hooks = []
 
     for feature in self.features:
-      assert not hasattr(feature, 'bot'), feature
-      feature.bot = self
-
       for name, value in vars(feature).items():
         if isinstance(value, app_commands.Group):
           self.tree.add_command(value)
@@ -118,7 +123,7 @@ class Client(discord.Client):
       await hook()
 
     if not options['dev']:
-      logging.info('Syncing command tree')
+      log.info('Syncing command tree')
       await self.tree.sync()
       await self.tree.sync(guild=discord.Object(config['guild']))
 
@@ -128,7 +133,7 @@ class Client(discord.Client):
       asyncio.create_task(log_exceptions(listener)(*args, **kwargs))
 
   async def on_ready(self):
-    logging.info(f'Logged in as {str(self.user)!r}')
+    log.info(f'Logged in as {str(self.user)!r}')
 
 client = None
 start_event = threading.Event()
@@ -156,14 +161,14 @@ def run():
 def start():
   if start_event.is_set():
     raise Exception('The bot is already started')
-  logging.info('Starting bot')
+  log.info('Starting bot')
   start_event.set()
 
 @console.operation(scope='bot', desc='stops the bot')
 def stop():
   if stop_event.is_set():
     raise Exception('The bot is already stopped')
-  logging.info('Stopping bot')
+  log.info('Stopping bot')
   stop_event.set()
   asyncio.run_coroutine_threadsafe(client.close(), client.loop)
 

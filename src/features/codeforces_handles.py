@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, logging, random, string
+import aiohttp, asyncio, discord, random, string
 from discord import app_commands
 
 import database
@@ -39,7 +39,7 @@ codeforces = app_commands.Group(name='codeforces', description='Komendy do nick�
 # TODO: replace this with codeforces's new oauth api
 @codeforces.command(name='set', description='Zapamiętuje twój nick na Codeforces')
 async def set_(interaction, handle: str):
-  logging.info(f'{interaction.user.id} requested to set their Codeforces handle to {handle!r}')
+  log.info(f'{interaction.user.id} requested to set their Codeforces handle to {handle!r}')
 
   if any(i not in string.ascii_letters + string.digits + '-._' for i in handle):
     await interaction.response.send_message('Taki nick zawiera niedozwolone znaki… 🤨', ephemeral=True)
@@ -80,11 +80,11 @@ async def set_(interaction, handle: str):
     success = None
 
   if success is not None:
-    logging.info(f'{interaction.user.id} has successfully set their Codeforces handle to {handle!r}')
+    log.info(f'{interaction.user.id} has successfully set their Codeforces handle to {handle!r}')
     assert set_handle(interaction.user.id, handle)
     await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na Codeforces na `{handle}`! 🥳\n{success}')
   else:
-    logging.info(f'{interaction.user.id} failed to verify their Codeforces handle ({first!r} & {last!r} != {a!r} & {b!r})')
+    log.info(f'{interaction.user.id} failed to verify their Codeforces handle ({first!r} & {last!r} != {a!r} & {b!r})')
     if first is None:
       read = 'end of file'
     elif '`' in first:
@@ -111,7 +111,7 @@ async def menu_get(interaction, user: discord.User):
 @codeforces.command(description='Zapomina twój nick na Codeforces')
 async def unset(interaction):
   if set_handle(interaction.user.id, None):
-    logging.info(f'{interaction.user.id} has unset their Codeforces handle')
+    log.info(f'{interaction.user.id} has unset their Codeforces handle')
     await interaction.response.send_message('Pomyślnie zapomniano twój nick na Codeforces. 🫡', ephemeral=True)
   else:
     await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na Codeforces… 🤨', ephemeral=True)

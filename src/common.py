@@ -14,13 +14,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, json, logging, time
+import aiohttp, asyncio, discord, json, time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from discord import app_commands
 from functools import wraps
+from logging import getLogger
 from typing import Callable
 from zoneinfo import ZoneInfo
+
+log = getLogger(__name__)
 
 options = {
   'config': 'config.json',
@@ -169,7 +172,7 @@ def redacted_config():
   return result
 
 def load_config():
-  logging.info('Loading config')
+  log.info('Loading config')
   try:
     with open(options['config'], 'r') as file:
       global config
@@ -178,7 +181,7 @@ def load_config():
     raise Exception(f'Config not found: {options["config"]!r}')
 
 def save_config():
-  logging.info('Saving config')
+  log.info('Saving config')
   with open(options['config'], 'w') as file:
     json.dump(config, file, indent=2)
 
@@ -333,7 +336,7 @@ def log_exceptions(func):
     except asyncio.CancelledError:
       raise
     except:
-      logging.exception(f'Got exception in {func.__name__!r}')
+      log.exception(f'Got exception in {func.__name__!r}')
       raise
   return inner
 
@@ -379,16 +382,16 @@ class Loop:
           await self.func()
         except self.transient_exceptions:
           if i >= len(self.retries):
-            logging.exception(f'Got transient exception in loop {self.func.__name__!r}')
+            log.exception(f'Got transient exception in loop {self.func.__name__!r}')
             break
           delay = parse_duration(self.retries[i])
           i += 1
-          logging.exception(f'Got transient exception in loop {self.func.__name__!r}. Retrying in {delay} seconds')
+          log.exception(f'Got transient exception in loop {self.func.__name__!r}. Retrying in {delay} seconds')
           await asyncio.sleep(delay)
           self.is_retrying = True
           continue
         except:
-          logging.exception(f'Got exception in loop {self.func.__name__!r}')
+          log.exception(f'Got exception in loop {self.func.__name__!r}')
         break
 
       if self.interval is not None:

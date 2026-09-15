@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging, random
+import asyncio, discord, random
 from datetime import datetime
 from discord import app_commands
 from math import floor, sqrt
@@ -41,7 +41,7 @@ def level_to_xp(level):
   return level * (level + 1) // 2 * 100
 
 async def update_roles_for(member):
-  logging.info(f'Updating XP roles for {member.id}')
+  log.info(f'Updating XP roles for {member.id}')
   assert member.guild.id == config['guild']
   level = xp_to_level(member.xp)
   await member.remove_roles(*(discord.Object(role) for threshold, role in config['xp_roles'] if level < threshold), atomic=False)
@@ -49,7 +49,7 @@ async def update_roles_for(member):
 
 @console.operation(desc='updates XP roles for all members')
 async def update_roles():
-  logging.info('Updating XP roles for all members')
+  log.info('Updating XP roles for all members')
   for member in bot.get_guild(config['guild']).members:
     await update_roles_for(member)
 
@@ -83,7 +83,7 @@ async def on_message(msg):
     database.data['xp_last_gain'][member.id] = now
 
   gain = random.randint(config['xp_min_gain'], config['xp_max_gain'])
-  logging.info(f'{member.id} gained {gain} XP')
+  log.info(f'{member.id} gained {gain} XP')
   with lock:
     old_level = xp_to_level(member.xp)
     member.xp += gain

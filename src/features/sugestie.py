@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging
+import asyncio, discord
 from base64 import b64decode, b64encode
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -86,9 +86,9 @@ def view_for(sugestia):
           await interaction2.response.send_message('Czas na opiniowanie tej sugestii już się skończył. ⏱️', ephemeral=True)
         else:
           if text_input.value == sugestia['opinions'].get(interaction2.user.id, {}).get('text'):
-            logging.info(f'{interaction2.user.id} bumped their opinion of sugestia {sugestia["id"]}')
+            log.info(f'{interaction2.user.id} bumped their opinion of sugestia {sugestia["id"]}')
           else:
-            logging.info(f'{interaction2.user.id} has given their opinion of sugestia {sugestia["id"]}')
+            log.info(f'{interaction2.user.id} has given their opinion of sugestia {sugestia["id"]}')
           sugestia['opinions'][interaction2.user.id] = {
             'text': text_input.value,
             'time': interaction2.created_at,
@@ -127,7 +127,7 @@ def view_for(sugestia):
           check_staff('usuwania opinii')(interaction2)
           author = int(choice)
 
-          logging.info(f"{interaction.user.id} has removed {author}'s opinion of sugestia {sugestia['id']}")
+          log.info(f"{interaction.user.id} has removed {author}'s opinion of sugestia {sugestia['id']}")
           del sugestia['opinions'][author]
           database.should_save = True
 
@@ -149,7 +149,7 @@ def view_for(sugestia):
           await interaction.response.send_message(f'Nie zaopiniowałeś jeszcze tej sugestii… 🤨', ephemeral=True)
           return
 
-        logging.info(f'{interaction.user.id} has removed their opinion of sugestia {sugestia["id"]}')
+        log.info(f'{interaction.user.id} has removed their opinion of sugestia {sugestia["id"]}')
         del sugestia['opinions'][interaction.user.id]
         database.should_save = True
 
@@ -194,14 +194,14 @@ def view_for(sugestia):
           database.should_save = True
 
         if is_change_of_mind:
-          logging.info(f'{user} has changed their vote to {choice!r} on sugestia {sugestia["id"]}')
+          log.info(f'{user} has changed their vote to {choice!r} on sugestia {sugestia["id"]}')
           replies = {
             'for': 'Pomyślnie zmieniono głos na **za** sugestią. 🫡',
             'abstain': 'Pomyślnie zmieniono głos na **wstrzymanie się** od głosu. 🫡',
             'against': 'Pomyślnie zmieniono głos na **przeciw** sugestii. 🫡',
           }
         else:
-          logging.info(f'{user} has voted {choice!r} on sugestia {sugestia["id"]}')
+          log.info(f'{user} has voted {choice!r} on sugestia {sugestia["id"]}')
           replies = {
             'for': 'Pomyślnie zagłosowano **za** sugestią. 🫡',
             'abstain': 'Pomyślnie **wstrzymano się** od głosu. 🫡',
@@ -283,7 +283,7 @@ def view_for(sugestia):
   return view
 
 async def update(sugestia):
-  logging.info(f'Updating sugestia {sugestia["id"]}')
+  log.info(f'Updating sugestia {sugestia["id"]}')
 
   if is_ongoing(sugestia):
     with database.lock:
@@ -292,14 +292,14 @@ async def update(sugestia):
         database.should_save = True
 
         if sugestia['outcome']:
-          logging.info(f'Sugestia {sugestia["id"]} has passed')
+          log.info(f'Sugestia {sugestia["id"]} has passed')
         else:
-          logging.info(f'Sugestia {sugestia["id"]} did not pass')
+          log.info(f'Sugestia {sugestia["id"]} did not pass')
 
   try:
     msg = await bot.get_channel(sugestia['channel']).fetch_message(sugestia['id'])
   except discord.errors.NotFound:
-    logging.warning(f'Sugestia {sugestia["id"]} is missing')
+    log.warning(f'Sugestia {sugestia["id"]} is missing')
     return
 
   buttonc_before = sum(len(i.children) for i in msg.components)
@@ -317,12 +317,12 @@ async def update(sugestia):
 @log_exceptions
 async def time_updates(sugestia):
   time = sugestia['review_end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
-  logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
+  log.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
   await sleep_until(time)
   await update(sugestia)
 
   time = sugestia['vote_end'] + timedelta(seconds=5) # 5 seconds to make sure the if passes.
-  logging.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
+  log.info(f'Waiting until {time} to update sugestia {sugestia["id"]}')
   await sleep_until(time)
   await update(sugestia)
 
@@ -332,7 +332,7 @@ async def clean():
     return
 
   if 'sugestie_clean_until' not in database.data:
-    logging.info('#sugestie has never been cleaned before')
+    log.info('#sugestie has never been cleaned before')
     database.data['sugestie_clean_until'] = datetime.now().astimezone()
     database.should_save = True
 
@@ -362,7 +362,7 @@ async def clean():
         embed.set_thumbnail(url=f'attachment://{filename}')
         my_msg = await msg.channel.send(embed=embed, file=discord.File(BytesIO(image), filename))
 
-      logging.info(f'{msg.author.id} created sugestia {my_msg.id}')
+      log.info(f'{msg.author.id} created sugestia {my_msg.id}')
       sugestia = {
         'id': my_msg.id,
         'channel': my_msg.channel.id,
@@ -433,7 +433,7 @@ async def on_check_failure(interaction, error):
 
 @event_listener
 async def on_ready():
-  logging.info('Cleaning #sugestie')
+  log.info('Cleaning #sugestie')
   await clean()
 
   for sugestia in database.data.get('sugestie', []):
@@ -441,12 +441,12 @@ async def on_ready():
     if is_ongoing(sugestia):
       asyncio.create_task(time_updates(sugestia))
 
-  logging.info('Sugestie is ready')
+  log.info('Sugestie is ready')
 
 @event_listener
 async def on_message(msg):
   if msg.channel.id == config['sugestie_channel'] and msg.author != bot.user:
-    logging.info('Cleaning #sugestie after a new message')
+    log.info('Cleaning #sugestie after a new message')
     await clean() # Same pattern as in counting.py
 
 sugestie = app_commands.Group(name='sugestie', description='Komendy do sugestii', guild_ids=[config['guild']])
@@ -516,7 +516,7 @@ async def done(interaction, changes: str):
   async def callback(interaction2, choice):
     sugestia = next(i for i in filter(is_pending, database.data['sugestie']) if i['id'] == int(choice))
 
-    logging.info(f'{interaction2.user.id} has marked sugestia {sugestia["id"]} as done')
+    log.info(f'{interaction2.user.id} has marked sugestia {sugestia["id"]} as done')
     sugestia['done'] = {
       'time': interaction2.created_at,
       'changes': changes,
@@ -547,7 +547,7 @@ async def annul(interaction, reason: str):
   async def callback(interaction2, choice):
     sugestia = next(i for i in filter(is_annullable, database.data['sugestie']) if i['id'] == int(choice))
 
-    logging.info(f'{interaction2.user.id} has annulled sugestia {sugestia["id"]}')
+    log.info(f'{interaction2.user.id} has annulled sugestia {sugestia["id"]}')
     sugestia['annulled'] = {
       'time': interaction2.created_at,
       'reason': reason,
@@ -580,7 +580,7 @@ async def erase(interaction):
   async def callback(interaction2, choice):
     sugestia = next(i for i in filter(is_eraseable_in(interaction2), database.data['sugestie']) if i['id'] == int(choice))
 
-    logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
+    log.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
     database.data['sugestie'].remove(sugestia)
     database.should_save = True
 
@@ -608,7 +608,7 @@ async def erase(interaction):
 
 @console.operation(desc='fixes all sugestie starting from the given one')
 async def fix_all(from_id: int):
-  logging.info(f'Updating all sugestie starting from {from_id}')
+  log.info(f'Updating all sugestie starting from {from_id}')
   for sugestia in database.data.get('sugestie', []):
     if sugestia['id'] >= from_id:
       await update(sugestia)
@@ -616,7 +616,7 @@ async def fix_all(from_id: int):
 
 @console.operation(desc='deletes the image from a sugestia')
 async def delete_image(id: int):
-  logging.info(f'Deleting image from sugestia {id}')
+  log.info(f'Deleting image from sugestia {id}')
   sugestia = next(i for i in database.data['sugestie'] if i['id'] == id)
   sugestia['image'] = None
   database.should_save = True

@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, logging
+import asyncio, discord
 from datetime import datetime, timedelta
 from discord import app_commands
 
@@ -76,7 +76,7 @@ async def eval():
   if config['help_forum_channel'] is None:
     return
 
-  logging.info('Periodically evaluating help forum karma')
+  log.info('Periodically evaluating help forum karma')
 
   now = datetime.now().astimezone()
   eval_max_age = parse_duration(config['help_forum_eval_max_age']) if config['help_forum_eval_max_age'] is not None else None

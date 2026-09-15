@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, datetime as dt, logging
+import asyncio, datetime as dt
 from datetime import datetime, timedelta
 from discord import app_commands
 from zoneinfo import ZoneInfo
@@ -36,7 +36,7 @@ async def check(msg):
   if msg.channel.id != config['budzik_channel'] or not config['budzik_roles'] or all(i.id != config['budzik_roles'][0][0] for i in msg.role_mentions):
     return
   time = msg.created_at.astimezone(ZoneInfo(config['timezone']))
-  logging.info(f'User {msg.author.id} pinged role {config["budzik_roles"][0][0]} at {time}')
+  log.info(f'User {msg.author.id} pinged role {config["budzik_roles"][0][0]} at {time}')
   date = time.date().isoformat()
   async with lock:
     if time <= database.data.setdefault('budzik_first_pings', {}).setdefault(date, {}).get(msg.author.id, time):
@@ -45,7 +45,7 @@ async def check(msg):
 
 @console.operation(desc='checks all relevant messages')
 async def check_all():
-  logging.info('Checking all relevant #budzik messages')
+  log.info('Checking all relevant #budzik messages')
   after = datetime.now().astimezone() - timedelta(days=config['budzik_max_age_days'] + 1)
   async for msg in bot.get_channel(config['budzik_channel']).history(after=after, limit=None):
     await check(msg)
@@ -106,7 +106,7 @@ def create_tasks(role, hour, minute):
   lock = asyncio.Lock()
   should_be_mentionable = None
 
-  logging.info(f'Scheduling the setting of role {role} to be mentionable for {hour}:{minute - 1:02}')
+  log.info(f'Scheduling the setting of role {role} to be mentionable for {hour}:{minute - 1:02}')
   @loop(time=dt.time(hour, minute - 1, tzinfo=ZoneInfo(config['timezone'])))
   async def enable():
     async with lock:
@@ -114,13 +114,13 @@ def create_tasks(role, hour, minute):
         nonlocal should_be_mentionable
         should_be_mentionable = True
       if not should_be_mentionable:
-        logging.warning(f'Giving up on setting role {role} to be mentionable')
+        log.warning(f'Giving up on setting role {role} to be mentionable')
         return
-      logging.info(f'Setting role {role} to be mentionable')
+      log.info(f'Setting role {role} to be mentionable')
       await bot.get_guild(config['guild']).get_role(role).edit(mentionable=True)
   enable.start()
 
-  logging.info(f'Scheduling the setting of role {role} to not be mentionable for {hour}:{minute + 1:02}')
+  log.info(f'Scheduling the setting of role {role} to not be mentionable for {hour}:{minute + 1:02}')
   @loop(time=dt.time(hour, minute + 1, tzinfo=ZoneInfo(config['timezone'])))
   async def disable():
     async with lock:
@@ -128,9 +128,9 @@ def create_tasks(role, hour, minute):
         nonlocal should_be_mentionable
         should_be_mentionable = False
       if should_be_mentionable:
-        logging.warning(f'Giving up on setting role {role} to not be mentionable')
+        log.warning(f'Giving up on setting role {role} to not be mentionable')
         return
-      logging.info(f'Setting role {role} to not be mentionable')
+      log.info(f'Setting role {role} to not be mentionable')
       await bot.get_guild(config['guild']).get_role(role).edit(mentionable=False)
   disable.start()
 

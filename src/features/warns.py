@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, logging, random
+import discord, random
 from dataclasses import dataclass
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -72,7 +72,7 @@ def do_expires_all():
     do_expires(user)
 
 async def warn(interaction, user, reason):
-  logging.info(f'Adding warn for {user.id} with reason {reason!r}')
+  log.info(f'Adding warn for {user.id} with reason {reason!r}')
   warn = {
     'time': interaction.created_at,
     'reason': reason,
@@ -89,7 +89,7 @@ async def warn(interaction, user, reason):
   try:
     await user.send(f'Właśnie dostałeś swoje **{count}-e** ostrzeżenie za `{debacktick(reason)}` na {msg}! 😒')
   except discord.Forbidden:
-    logging.warning(f'Cannot send warn notification to user {user.id}')
+    log.warning(f'Cannot send warn notification to user {user.id}')
 
 @app_commands.command(name='warn', description='Ostrzega użytkownika')
 @app_commands.guilds(config['guild'])
@@ -121,7 +121,7 @@ async def erase_warn(interaction, user):
   async def callback(interaction2, choice):
     warn = next(i for i in database.data['warns'][user.id] if id(i) == int(choice))
 
-    logging.info(f'Erasing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
+    log.info(f'Erasing warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
     database.data['warns'][user.id].remove(warn)
     database.should_save = True
 
@@ -197,7 +197,7 @@ async def edit_warn(interaction, user):
         old_reason = warn['reason']
         old_expired = warn['expired']
 
-        logging.info(f'Edited warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
+        log.info(f'Edited warn for {user.id} with reason {warn["reason"]!r} from {warn["time"]}')
         warn['reason'] = new_reason
         warn['expired'] = new_expired
         database.should_save = True
@@ -353,5 +353,5 @@ async def warns_all(interaction):
 async def toggle_warn_expiration(interaction):
   global warn_expiration_is_enabled
   warn_expiration_is_enabled = not warn_expiration_is_enabled
-  logging.info(f'{interaction.user.id} {"enabled" if warn_expiration_is_enabled else "disabled"} warn expiration')
+  log.info(f'{interaction.user.id} {"enabled" if warn_expiration_is_enabled else "disabled"} warn expiration')
   await interaction.response.send_message(f'Pomyślnie {"włączono" if warn_expiration_is_enabled else "wyłączono"} wygaszanie ostrzeżeń. 🫡', ephemeral=True)

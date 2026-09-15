@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, json, logging, subprocess
+import discord, json, subprocess
 from datetime import datetime
 from discord import app_commands
 from io import StringIO

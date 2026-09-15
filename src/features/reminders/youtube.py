@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, emoji, logging
+import aiohttp, asyncio, discord, emoji
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from defusedxml import ElementTree
@@ -47,9 +47,9 @@ class Video:
 async def remind(video):
   if video.is_livestream:
     time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
-    logging.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
+    log.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
     await sleep_until(time)
-    logging.info(f'Reminding about YouTube livestream {video.id}')
+    log.info(f'Reminding about YouTube livestream {video.id}')
 
   if config['oki_channel'] is None:
     return
@@ -67,7 +67,7 @@ reminders = {}
 
 async def process_videos(ids):
   ids = list(ids)
-  logging.info(f'Processing YouTube videos: {ids!r}')
+  log.info(f'Processing YouTube videos: {ids!r}')
 
   if not ids:
     return
@@ -75,14 +75,14 @@ async def process_videos(ids):
   async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
     response = await session.get('videos', params={'key': config['youtube_api_key'], 'part': 'snippet,liveStreamingDetails', 'id': ids})
     if not response.ok:
-      logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
+      log.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
       return
     json = await response.json()
 
   for i in ids:
     try:
       if reminders[i].cancel():
-        logging.info(f'Unset reminder for YouTube livestream {i}')
+        log.info(f'Unset reminder for YouTube livestream {i}')
       del reminders[i]
     except KeyError:
       pass
@@ -99,7 +99,7 @@ async def process_videos(ids):
     videos.append(video)
 
   if 'oki_last_published' not in database.data:
-    logging.info("OKI's YouTube channel has never been checked before")
+    log.info("OKI's YouTube channel has never been checked before")
     database.data['oki_last_published'] = datetime.now().astimezone()
     database.should_save = True
 
@@ -125,7 +125,7 @@ websub.on_msg = lambda feed: asyncio.run_coroutine_threadsafe(process_feed(feed)
 @event_listener
 async def on_setup():
   try:
-    logging.info("Downloading OKI's YouTube channel feed")
+    log.info("Downloading OKI's YouTube channel feed")
     async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
       for params in [
         {'type': 'video', 'order': 'date', 'maxResults': 50},
@@ -133,9 +133,9 @@ async def on_setup():
       ]:
         response = await session.get('search', params=params | {'channelId': config['oki_youtube'], 'key': config['youtube_api_key']})
         if not response.ok: # TODO: retry on error?
-          logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
+          log.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
           continue
         await process_videos(i['id']['videoId'] for i in (await response.json())['items'])
-    logging.info("Processed OKI's YouTube channel feed")
+    log.info("Processed OKI's YouTube channel feed")
   except Exception as e:
-    logging.exception('Got exception while downloading YouTube channel feed')
+    log.exception('Got exception while downloading YouTube channel feed')

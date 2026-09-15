@@ -17,11 +17,14 @@
 # TODO: switch to rapidjson
 # IDEA: "json models" as a sort of wrapper around raw json data, with fancy attribute setter/getter magic methods?
 
-import json, logging, os, shutil, threading
+import json, os, shutil, threading
 from datetime import date, datetime
+from logging import getLogger
 
 import console
 from common import config, parse_duration
+
+log = getLogger(__name__)
 
 data = None
 should_save = False
@@ -29,7 +32,7 @@ lock = threading.RLock()
 
 @console.operation(scope='database', desc='loads the database from file')
 def load():
-  logging.info('Loading database')
+  log.info('Loading database')
   with lock:
     try:
       def object_hook(object):
@@ -54,7 +57,7 @@ def load():
 
 @console.operation(scope='database', desc='saves the database to file')
 def save():
-  logging.info('Saving database')
+  log.info('Saving database')
   with lock:
     assert data is not None
     global should_save
@@ -87,7 +90,7 @@ def start():
   global autosave_thread, autosave_stop
   if autosave_thread is not None or autosave_stop is not None:
     raise Exception('The database is already started')
-  logging.info('Starting database')
+  log.info('Starting database')
 
   load()
 
@@ -106,7 +109,7 @@ def stop():
   global autosave_thread, autosave_stop
   if autosave_thread is None or autosave_stop is None:
     raise Exception('The database is already stopped')
-  logging.info('Stopping database')
+  log.info('Stopping database')
 
   autosave_stop.set()
   autosave_thread.join()

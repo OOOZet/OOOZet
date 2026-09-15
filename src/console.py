@@ -14,12 +14,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, inspect, json, logging, pprint, socket, threading, time, traceback
+import asyncio, inspect, json, pprint, socket, threading, time, traceback
 from dataclasses import dataclass
+from logging import getLogger
 from typing import Callable, Optional
 
 import common
 from common import config, parse_duration, redacted_config
+
+log = getLogger(__name__)
 
 async_loop = None
 server = None
@@ -38,10 +41,10 @@ def start():
   thread = threading.Thread(target=listen)
   thread.start()
 
-  logging.info(f'Started console on {config["console_host"]}:{config["console_port"]}')
+  log.info(f'Started console on {config["console_host"]}:{config["console_port"]}')
 
 def stop():
-  logging.info('Stopping console')
+  log.info('Stopping console')
 
   global should_stop_listen, should_stop_conn
   should_stop_listen = True
@@ -69,7 +72,7 @@ def listen():
     except OSError:
       continue # We probably got cancelled by stop().
 
-    logging.info(f'Console accepted connection from {addr[0]}:{addr[1]}')
+    log.info(f'Console accepted connection from {addr[0]}:{addr[1]}')
     try:
       client.send(f'{config["console_hello"]} says hello!\n'.encode())
       client.send('Type "help" to get a list of available operations.\n'.encode())
@@ -119,21 +122,21 @@ def listen():
       try:
         line = line.decode()
       except Exception as e:
-        logging.exception('Got exception while decoding console command')
+        log.exception('Got exception while decoding console command')
         try:
           client.send(''.join(traceback.format_exception(None, e, e.__traceback__)).encode())
         except BrokenPipeError: # The client sent junk and ran away.
           pass
         continue
 
-      logging.info(f'Console received command {line!r}')
+      log.info(f'Console received command {line!r}')
 
       try:
         reply = run(line)
         if reply is not None and not isinstance(reply, str):
           reply = pprint.pformat(reply, sort_dicts=False)
       except Exception as e:
-        logging.exception('Got exception while running console command')
+        log.exception('Got exception while running console command')
         reply = ''.join(traceback.format_exception(None, e, e.__traceback__))
 
       try:
@@ -149,9 +152,9 @@ def listen():
         client.shutdown(socket.SHUT_RDWR)
       client.close()
     except:
-      logging.exception('Got exception while closing console connection')
+      log.exception('Got exception while closing console connection')
     client = None
-    logging.info('Console connection closed')
+    log.info('Console connection closed')
 
 def operation(*args, **kwargs):
   def decorator(func):

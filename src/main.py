@@ -16,10 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, logging, sys
+import discord, sys
+from logging import getLogger
 
 import bot, common, console, database
 from common import options
+
+log = getLogger(__name__)
 
 if __name__ == '__main__':
   i = 0
@@ -43,7 +46,7 @@ if __name__ == '__main__':
   database.start()
 
   # We delay the importing of features because they usually require the config.
-  logging.info('Importing features')
+  log.info('Importing features')
   import features.all
   from features.reminders import websub
   websub.start()

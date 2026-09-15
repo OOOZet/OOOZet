@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, logging
+import discord
 from datetime import timedelta
 from discord import app_commands
 from itertools import chain
@@ -35,7 +35,7 @@ async def kick(interaction, member):
     except discord.Forbidden:
       await interaction.response.send_message(f'Nie mam uprawnień, żeby skickować {member.mention}… 🧐', ephemeral=True)
     else:
-      logging.info(f'{interaction.user.id} kicked {member.id}')
+      log.info(f'{interaction.user.id} kicked {member.id}')
       await interaction.response.send_message(f'Pomyślnie skickowano {member.mention}. 😒', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
 
 @app_commands.command(name='kick', description='Kickuje użytkownika')
@@ -61,7 +61,7 @@ async def ban(interaction, user, reason):
     except discord.Forbidden:
       await interaction.response.send_message(f'Nie mam uprawnień, żeby zbanować {user.mention}… 🧐', ephemeral=True)
     else:
-      logging.info(f'{interaction.user.id} banned {user.id} for {reason!r}')
+      log.info(f'{interaction.user.id} banned {user.id} for {reason!r}')
       await interaction.response.send_message(f'Pomyślnie zbanowano {user.mention} za `{debacktick(reason)}`. 😒', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
 
 @app_commands.command(name='ban', description='Banuje użytkownika')
@@ -86,7 +86,7 @@ async def menu_ban(interaction, user: discord.User):
 async def unban(interaction, user):
   try:
     await interaction.guild.unban(user, reason=f'Na żądanie {interaction.user}')
-    logging.info(f'{interaction.user.id} unbanned {user.id}')
+    log.info(f'{interaction.user.id} unbanned {user.id}')
   except discord.NotFound:
     await interaction.response.send_message(f'{user.mention} nie jest obecnie zbanowany… 🤨', ephemeral=True)
   else:
@@ -109,7 +109,7 @@ async def purge_everywhere(interaction, user):
     await interaction2.response.defer(thinking=True, ephemeral=True)
     max_age = select.values[0]
 
-    logging.info(f"{interaction.user.id} requested to purge {user.id}'s messages younger than {max_age} everywhere in guild {interaction.guild.id}")
+    log.info(f"{interaction.user.id} requested to purge {user.id}'s messages younger than {max_age} everywhere in guild {interaction.guild.id}")
 
     try:
       deletedc = 0
@@ -171,7 +171,7 @@ async def purge(interaction, from_: str, to: str | None, user: discord.User | No
       await interaction.followup.send('Ostatnia wiadomość o takim ID nie istnieje na tym kanale… 🤨', ephemeral=True)
       return
 
-  logging.info(
+  log.info(
     f'{interaction.user.id} requested to purge messages in channel {interaction.channel.id}' +
     ('' if from_ is None else f' from {from_.id}') +
     ('' if to is None else f' to {to.id}') +
@@ -222,7 +222,7 @@ async def purge(interaction, from_: str, to: str | None, user: discord.User | No
 async def timeout_here(interaction, max_age: str, duration: str = '1h'):
   await interaction.response.defer(ephemeral=True)
 
-  logging.info(f'{interaction.user.id} requested to timeout for {duration} authors of messages younger than {max_age} in {interaction.channel.id}')
+  log.info(f'{interaction.user.id} requested to timeout for {duration} authors of messages younger than {max_age} in {interaction.channel.id}')
 
   timed_out = set()
   skipped = set()
