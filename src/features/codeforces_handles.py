@@ -14,10 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, asyncio, discord, random, string
+import aiohttp, discord, random, string
+from datetime import datetime, timedelta
 from discord import app_commands
 
 import database
+from common import mention_datetime, sleep_until
 
 def get_handle(user):
   return database.data.get('codeforces_handles', {}).get(user)
@@ -54,10 +56,10 @@ async def set_(interaction, handle: str):
   a = random.choice(['Agent', 'Legenda', 'Mistrz', 'Pogromca', 'Przyjaciel', 'Zaklinacz', 'Zbawiciel', 'Zjadacz'])
   b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
 
-  # TODO: this could be a relative mention_datetime
   # U+202F is not a word break and allows both words to be selected at once.
-  await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True)
-  await asyncio.sleep(3 * 60)
+  deadline = datetime.now().astimezone() + timedelta(seconds=3 * 60)
+  await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoje imię](https://codeforces.com/settings/social) na `{a}\u202f{b}`. Sprawdzę je {mention_datetime(deadline, relative=True)}. Do tego momentu proszę cierpliwie czekaj. 🥺', ephemeral=True)
+  await sleep_until(deadline)
 
   async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
     json = await (await session.get('user.info', params={'handles': handle, 'checkHistoricHandles': 'false'})).json()

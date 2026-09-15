@@ -193,8 +193,9 @@ async def set_(interaction, handle: str):
   b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
 
   # U+202F is not a word break and allows both words to be selected at once.
-  await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoją przynależność](https://atcoder.jp/settings) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True, suppress_embeds=True)
-  await asyncio.sleep(3 * 60)
+  deadline = datetime.now().astimezone() + timedelta(seconds=3 * 60)
+  await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoją przynależność](https://atcoder.jp/settings) na `{a}\u202f{b}`. Sprawdzę ją {mention_datetime(deadline, relative=True)}. Do tego momentu proszę cierpliwie czekaj. 🥺', ephemeral=True, suppress_embeds=True)
+  await sleep_until(deadline)
 
   async with aiohttp.ClientSession(raise_for_status=True) as session:
     text = await (await session.get(f'https://atcoder.jp/users/{handle}')).text()

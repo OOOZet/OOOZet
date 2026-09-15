@@ -464,7 +464,7 @@ async def poll():
 
   async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
     json = await (await session.get('problemset.problems')).json()
-    contests = await (await session.get('contest.list')).json()
+    contests = await (await session.get('contest.list')).json() # HACK: we probably shouldn't duplicate this with reminders.codeforces
   if json['status'] != 'OK':
     log.error(f'Codeforces problemset request failed: {json["comment"]!r}')
     return

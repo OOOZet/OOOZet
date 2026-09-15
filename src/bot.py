@@ -15,7 +15,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # TODO: anti-nuke
-# IDEA: download source code button
 
 import asyncio, discord, random, sys, threading
 from discord import app_commands
