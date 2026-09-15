@@ -31,6 +31,7 @@ def check_counting_channel(interaction):
   if config['counting_channel'] is None:
     raise NoCountingChannelError()
 
+@event_listener
 async def on_check_failure(interaction, error):
   if isinstance(error, NoCountingChannelError):
     await interaction.response.send_message('Na tym serwerze nie został jeszcze stworzony kanał #liczenie. 😴', ephemeral=True)

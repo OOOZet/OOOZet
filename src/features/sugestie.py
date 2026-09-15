@@ -218,10 +218,8 @@ def view_for(sugestia):
       for button in view.children:
         button.disabled = True
 
-  # TODO: show this as a modal?
   async def on_describe(interaction):
-    url = mention_message(bot, sugestia['channel'], sugestia['id'])
-    result = f'## Sugestia {url}\n'
+    result = ''
 
     if sugestia.get('annulled', {}).get('time', datetime.now().astimezone()) < sugestia['review_end']:
       review_end = mention_datetime(sugestia['review_end'])
@@ -273,8 +271,12 @@ def view_for(sugestia):
       else:
         result += 'Sugestia **nie została jeszcze wykonana** przez administrację. ❓\n'
 
-    msg = await interaction.user.send(result)
-    await interaction.response.send_message(f'Więcej informacji o sugestii zostało przesłane Ci w [wiadomości prywatnej]({msg.jump_url}). 😊', ephemeral=True)
+    modal = discord.ui.Modal(title='Więcej informacji o sugestii')
+    modal.add_item(discord.ui.TextDisplay(result))
+    async def on_submit(interaction):
+      await interaction.response.defer()
+    modal.on_submit = on_submit
+    await interaction.response.send_modal(modal)
 
   describe_button = discord.ui.Button(custom_id='describe', label='Więcej informacji', style=discord.ButtonStyle.blurple)
   describe_button.callback = on_describe
