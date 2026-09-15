@@ -34,8 +34,7 @@ config = {
   'token': None,                             # Token twojego bota
   'database': 'database.json',               # Ścieżka do pliku z baza danych
   'autosave': '1m',                          # Regularny odstęp czasu, w którym baza danych będzie automatycznie zapisywana, gdy jest to potrzebne
-  'console_host': 'localhost',               # Te dwa są w zasadzie oczywiste
-  'console_port': 2341,
+  'console_port': 2341,                      # To jest w zasadzie oczywiste
   'console_hello': 'OOOZet',                 # Nazwa wyświetlana w "… says hello!" po połączeniu się z konsolą
   'console_timeout': '1m',                   # Czas od ostatniej odebranej komendy, po którym połączenie z konsolą zostanie automatycznie zerwane
 

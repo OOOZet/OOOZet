@@ -34,14 +34,17 @@ def start():
   global server
   server = socket.socket()
   server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-  server.bind((config['console_host'], config['console_port'])) # TODO: we shouldn't even allow opening this to the greater internet
+  # This connection has absolutely no authentication and should never be exposed to the
+  # Internet directly. If you really want to access it remotely, then use an SSH tunnel.
+  host = '127.0.0.1'
+  server.bind((host, config['console_port']))
   server.listen(1)
 
   global thread
   thread = threading.Thread(target=listen)
   thread.start()
 
-  log.info(f'Started console on {config["console_host"]}:{config["console_port"]}')
+  log.info(f'Started console on {host}:{config["console_port"]}')
 
 def stop():
   log.info('Stopping console')
