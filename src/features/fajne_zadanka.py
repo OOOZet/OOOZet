@@ -25,9 +25,7 @@ from time import time
 from urllib.parse import parse_qs, unquote, urlparse
 
 import console, database
-from common import config, parse_duration
-
-bot = None
+from common import config, event_listener, parse_duration
 
 async def codeforces_auth_middleware(request, handler):
   url = request.url.update_query(apiKey=config['codeforces_api_key'], time=int(time())).without_query_params('apiSig')
@@ -121,7 +119,8 @@ async def find_problem(url):
       url = f'https://onlinejudge.org/index.php?option=com_onlinejudge&Itemid=8&page=show_problem&problem={int(match[0])}'
       return url, (await fetch_html(url)).find(id='col3').find_all('tr')[1].h3.text.partition(' - ')[2]
 
-async def fix(id):
+@console.operation(desc='fixes embed')
+async def fix(id: int):
   msg = await bot.get_channel(config['fajne_zadanka_channel']).fetch_message(id)
   embed = msg.embeds[0]
   metadata = await find_problem(embed.url)
@@ -129,99 +128,91 @@ async def fix(id):
     embed.url, embed.title = metadata
     await msg.edit(embed=embed)
 
-async def setup(_bot):
-  global bot
-  bot = _bot
+lock = asyncio.Lock()
 
-  lock = asyncio.Lock()
+async def clean():
+  if config['fajne_zadanka_channel'] is None:
+    return
 
-  async def clean():
-    if config['fajne_zadanka_channel'] is None:
-      return
+  if 'fajne_zadanka_clean_until' not in database.data:
+    logging.info('#fajne-zadanka has never been cleaned before')
+    database.data['fajne_zadanka_clean_until'] = datetime.now().astimezone()
+    database.should_save = True
 
-    if 'fajne_zadanka_clean_until' not in database.data:
-      logging.info('#fajne-zadanka has never been cleaned before')
-      database.data['fajne_zadanka_clean_until'] = datetime.now().astimezone()
+  async with lock:
+    async for msg in bot.get_channel(config['fajne_zadanka_channel']).history(limit=None, after=database.data['fajne_zadanka_clean_until']):
+      if msg.author == bot.user:
+        continue
+
+      await msg.delete()
+      if msg.author.bot:
+        continue
+
+      if match := re.match(r'https?://[^\s]+', msg.content):
+        url = match[0]
+        description = msg.content.removeprefix(url).lstrip()
+      elif match := re.search(r'https?://[^\s]+$', msg.content):
+        url = match[0]
+        description = msg.content.removesuffix(url).rstrip()
+      else:
+        await msg.author.send(
+          f'Twoja wiadomość musi zaczynać się lub konczyć linkiem do zadania, abyś mógł ją wysłać na {msg.channel.mention}. 🤓',
+          file=discord.File(StringIO(msg.content), 'message.md'),
+        )
+        continue
+
+      if not description:
+        await msg.author.send(
+          f'Twoja wiadomość musi zaczynać się lub konczyć krótkim opisem zadania (trudność i wymagane algorytmy), abyś mógł ją wysłać na {msg.channel.mention}. 🤓',
+          file=discord.File(StringIO(msg.content), 'message.md'),
+        )
+        continue
+
+      try:
+        url, title = await find_problem(url) or (url, url)
+      except:
+        logging.exception('Got exception while finding problem metadata')
+        title = url
+
+      embed = discord.Embed(title=title, url=url, description=description)
+      embed.set_footer(text=str(msg.author), icon_url=msg.author.display_avatar.url)
+      my_msg = await msg.channel.send(embed=embed)
+      await my_msg.add_reaction('❤️')
+      await my_msg.add_reaction('👍')
+      await msg.author.send(f'Zareaguj ❌ na [swoją wiadomość]({my_msg.jump_url}), gdy będziesz chciał ją usunąć. 😊')
+
+      database.data['fajne_zadanka_clean_until'] = msg.created_at
       database.should_save = True
 
-    async with lock:
-      async for msg in bot.get_channel(config['fajne_zadanka_channel']).history(limit=None, after=database.data['fajne_zadanka_clean_until']):
-        if msg.author == bot.user:
-          continue
+@event_listener
+async def on_ready():
+  logging.info('Cleaning #fajne-zadanka')
+  await clean()
+  logging.info('Fajne zadanka is ready')
 
-        await msg.delete()
-        if msg.author.bot:
-          continue
+@event_listener
+async def on_message(msg):
+  if msg.channel.id == config['fajne_zadanka_channel']:
+    logging.info('Cleaning #fajne-zadanka after a new message')
+    await clean() # Same pattern as in counting.py
 
-        if match := re.match(r'https?://[^\s]+', msg.content):
-          url = match[0]
-          description = msg.content.removeprefix(url).lstrip()
-        elif match := re.search(r'https?://[^\s]+$', msg.content):
-          url = match[0]
-          description = msg.content.removesuffix(url).rstrip()
-        else:
-          await msg.author.send(
-            f'Twoja wiadomość musi zaczynać się lub konczyć linkiem do zadania, abyś mógł ją wysłać na {msg.channel.mention}. 🤓',
-            file=discord.File(StringIO(msg.content), 'message.md'),
-          )
-          continue
+@event_listener
+async def on_raw_reaction_add(payload):
+  if payload.channel_id != config['fajne_zadanka_channel'] or payload.member == bot.user:
+    return
+  msg = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
+  if msg.author != bot.user or not msg.embeds:
+    return
 
-        if not description:
-          await msg.author.send(
-            f'Twoja wiadomość musi zaczynać się lub konczyć krótkim opisem zadania (trudność i wymagane algorytmy), abyś mógł ją wysłać na {msg.channel.mention}. 🤓',
-            file=discord.File(StringIO(msg.content), 'message.md'),
-          )
-          continue
-
+  is_author = msg.embeds[0].footer.text == str(bot.get_user(payload.user_id)) # Watch out for identity theft!
+  if payload.emoji.name == '❌' and is_author:
+    await msg.delete()
+  elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me) or is_author:
+    await msg.remove_reaction(payload.emoji, discord.Object(payload.user_id))
+  else:
+    for reaction in msg.reactions:
+      if reaction.emoji != payload.emoji.name:
         try:
-          url, title = await find_problem(url) or (url, url)
-        except:
-          logging.exception('Got exception while finding problem metadata')
-          title = url
-
-        embed = discord.Embed(title=title, url=url, description=description)
-        embed.set_footer(text=str(msg.author), icon_url=msg.author.display_avatar.url)
-        my_msg = await msg.channel.send(embed=embed)
-        await my_msg.add_reaction('❤️')
-        await my_msg.add_reaction('👍')
-        await msg.author.send(f'Zareaguj ❌ na [swoją wiadomość]({my_msg.jump_url}), gdy będziesz chciał ją usunąć. 😊')
-
-        database.data['fajne_zadanka_clean_until'] = msg.created_at
-        database.should_save = True
-
-  @bot.listen()
-  async def on_ready():
-    logging.info('Cleaning #fajne-zadanka')
-    await clean()
-    logging.info('Fajne zadanka is ready')
-
-  @bot.listen()
-  async def on_message(msg):
-    if msg.channel.id == config['fajne_zadanka_channel']:
-      logging.info('Cleaning #fajne-zadanka after a new message')
-      await clean() # Same pattern as in counting.py
-
-  @bot.listen()
-  async def on_raw_reaction_add(payload):
-    if payload.channel_id != config['fajne_zadanka_channel'] or payload.member == bot.user:
-      return
-    msg = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
-    if msg.author != bot.user or not msg.embeds:
-      return
-
-    is_author = msg.embeds[0].footer.text == str(bot.get_user(payload.user_id)) # Watch out for identity theft!
-    if payload.emoji.name == '❌' and is_author:
-      await msg.delete()
-    elif payload.emoji.name not in (i.emoji for i in msg.reactions if i.me) or is_author:
-      await msg.remove_reaction(payload.emoji, discord.Object(payload.user_id))
-    else:
-      for reaction in msg.reactions:
-        if reaction.emoji != payload.emoji.name:
-          try:
-            await reaction.remove(discord.Object(payload.user_id))
-          except discord.NotFound:
-            pass
-
-console.begin('fajne_zadanka')
-console.register('fix', '<id>', 'fixes embed', lambda x: asyncio.run_coroutine_threadsafe(fix(int(x)), bot.loop).result())
-console.end()
+          await reaction.remove(discord.Object(payload.user_id))
+        except discord.NotFound:
+          pass

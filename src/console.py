@@ -14,13 +14,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import json, logging, pprint, socket, threading, time, traceback
+import asyncio, inspect, json, logging, pprint, socket, threading, time, traceback
 from dataclasses import dataclass
 from typing import Callable, Optional
 
 import common
 from common import config, parse_duration, redacted_config
 
+async_loop = None
 server = None
 thread = None
 should_stop_listen = False
@@ -152,13 +153,48 @@ def listen():
     client = None
     logging.info('Console connection closed')
 
-@dataclass
+def operation(*args, **kwargs):
+  def decorator(func):
+    return Operation(func, *args, **kwargs)
+  return decorator
+
 class Operation:
-  scope: list[str]
-  names: list[str]
-  params: str | None
-  desc: str
-  func: Callable[[str], Optional[any]]
+  def __init__(self, func, *, scope=None, name=None, params=None, desc=None, should_split_args=True):
+    self.func = func
+    self.scope = scope
+    self.name = func.__name__.strip('_').replace('_', '-') if name is None else name
+    if params is None:
+      params = []
+      for i in inspect.signature(func).parameters.values():
+        name = i.name.strip('_').replace('_', '-')
+        if i.kind == i.VAR_POSITIONAL:
+          params.append(f'[{name}...]')
+        elif i.kind in {i.POSITIONAL_ONLY, i.POSITIONAL_OR_KEYWORD}:
+          if i.default is i.empty:
+            params.append(f'<{name}>')
+          else:
+            params.append(f'[{name}]')
+        else:
+          assert i.kind in {i.KEYWORD_ONLY, i.VAR_KEYWORD}, i
+      params = ' '.join(params) if params else None
+    self.params = params
+    self.desc = desc
+    self.should_split_args = should_split_args
+
+  @property
+  def scope(self):
+    return '.'.join(self.scope_parts) if self.scope_parts else None
+
+  @scope.setter
+  def scope(self, value):
+    self.scope_parts = [] if value is None else value.split('.')
+
+  @property
+  def scoped_name(self):
+    return '.'.join(self.scope_parts + [self.name])
+
+  def __call__(self, *args, **kwargs):
+    return self.func(*args, **kwargs)
 
 operations = []
 
@@ -167,56 +203,54 @@ def run(cmd):
   if not cmd:
     return
 
-  if ' ' in cmd:
-    name, _, arg = cmd.partition(' ')
+  name, _, arg = cmd.partition(' ')
+  if arg is not None:
     arg = arg.lstrip()
-  else:
-    name = cmd
-    arg = ''
 
   for op in operations:
-    if name in ('.'.join(op.scope + [name]) for name in op.names):
-      if op.params is not None:
-        return op.func(arg)
-      elif arg:
-        raise Exception(f'Operation {name!r} expects no arguments')
+    assert all(map(is_identifier, op.scope_parts)) and is_identifier(op.name), op.scoped_name
+    if name != op.scoped_name:
+      continue
+
+    if arg is None:
+      args = []
+    elif op.should_split_args:
+      args = arg.split()
+    else:
+      args = [arg]
+    params = [i for i in inspect.signature(op.func).parameters.values() if i.kind not in {i.KEYWORD_ONLY, i.VAR_KEYWORD}]
+    is_vararg = params and params[-1].kind == params[-1].VAR_POSITIONAL
+    for i in range(len(args) if is_vararg else min(len(args), len(params))):
+      cls = params[min(i, len(params) - 1)].annotation
+      if cls is int:
+        args[i] = int(args[i])
       else:
-        return op.func()
+        assert cls is str, (op.scoped_name, i)
+
+    result = op(*args)
+    if asyncio.iscoroutine(result):
+      return asyncio.run_coroutine_threadsafe(result, async_loop).result()
+    else:
+      return result
+
   raise Exception(f'Unknown operation: {name!r}')
 
-scope = []
+def is_identifier(string):
+  return string and '.' not in string and not any(map(str.isspace, string)) and string.isprintable()
 
-def begin(name):
-  scope.append(name)
+def register(*ops):
+  for op in ops:
+    assert op not in operations
+    operations.append(op)
 
-def end():
-  scope.pop()
-
-def register(names, params, desc, func):
-  if not isinstance(names, list):
-    names = [names]
-  operations.append(Operation(scope.copy(), names, params, desc, func))
-
+@operation(name='help', desc='prints this help message')
 def op_help():
   lines = []
   max_a_width = 0
   for op in operations:
-    a = '  '
-    for name in op.scope:
-      a += name + '.'
-
-    if len(op.names) <= 1:
-      a += op.names[0]
-    else:
-      if op.scope:
-        a += '{'
-      a += ', '.join(op.names)
-      if op.scope:
-        a += '}'
-
+    a = '  ' + op.scoped_name
     if op.params is not None:
       a += ' ' + op.params
-
     lines.append((a, op.desc))
     max_a_width = max(max_a_width, len(a))
 
@@ -225,11 +259,13 @@ def op_help():
     result += a.ljust(max_a_width + 2) + b + '\n'
   return result
 
+@operation(name='bye', desc='closes this connection')
 def op_bye():
   global should_stop_conn
   should_stop_conn = True
   return 'Goodbye!'
 
+@operation(name='restart', desc='restarts the console')
 def op_restart():
   stop()
   # We have to delay the start() because otherwise it would override client and
@@ -243,18 +279,25 @@ def op_restart():
   delayed_start.start()
   return 'Restarting the console...'
 
-register('help',    None, 'prints this help message', op_help)
-register('bye',     None, 'closes this connection',   op_bye)
-register('restart', None, 'restarts the console',     op_restart)
+@operation(scope='config', name='all', desc='prints the config')
+def op_all():
+  return redacted_config()
 
-def op_set(arg):
+@operation(scope='config', name='get', desc='prints the value of config key')
+def op_get(key: str):
+  return redacted_config()[key]
+
+@operation(scope='config', name='set', params='<key> <json value>', desc='sets config key to value', should_split_args=False)
+def op_set(arg: str):
   key, _, value = arg.partition(' ')
   config[key] = json.loads(value)
 
-begin('config')
-register('all',  None,                 'prints the config',              lambda: redacted_config())
-register('get',  '<key>',              'prints the value of config key', lambda arg: redacted_config()[arg])
-register('set',  '<key> <json value>', 'sets config key to value',       op_set)
-register('load', None,                 'loads the config from file',     common.load_config)
-register('save', None,                 'saves the config to file',       common.save_config)
-end()
+@operation(scope='config', name='load', desc='loads the config from file')
+def op_load():
+  common.load_config()
+
+@operation(scope='config', name='save', desc='saves the config to file')
+def op_save():
+  common.save_config()
+
+register(op_help, op_bye, op_restart, op_all, op_get, op_set, op_load, op_save)

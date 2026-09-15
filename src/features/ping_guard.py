@@ -15,136 +15,132 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio, discord
+from discord import app_commands
 
 import database
 from common import config, parse_duration
 from features.warns import warns_of
 
-bot = None
 lock = asyncio.Lock()
 
-async def setup(_bot):
-  global bot
-  bot = _bot
+async def ping_role(interaction, msg):
+  async def on_submit(interaction):
+    role = select.values[0]
 
-  async def ping_role(interaction, msg):
-    async def on_submit(interaction):
-      role = select.values[0]
-
-      async with lock: # Guards against TOCTOU attacks on cooldowns.
-        last_use = database.data.get('ping_role_last_use', {}).get(interaction.user.id)
-        if last_use is not None and (interaction.created_at - last_use).total_seconds() < parse_duration(config['ping_role_cooldown']):
-          await interaction.response.send_message('Musisz zaczekać, aby móc ponownie użyć tej komendy. ⏱️', ephemeral=True)
-          return
-
-        is_authorized = False
-        authorizing_rule = None
-        role_is_unlockable = False
-        rules_not_satisfied_msg = f'Nie możesz pingnąć {role.mention}, ponieważ:\n'
-
-        if role.mentionable or interaction.permissions.mention_everyone:
-          is_authorized = True
-        else:
-          for rule in config['ping_role_rules']:
-            if role.id not in rule['unlocked_roles']:
-              continue
-            role_is_unlockable = True
-
-            if rule['required_role'] is not None and interaction.user.get_role(rule['required_role']) is None:
-              rules_not_satisfied_msg += f'- Nie masz roli <@&{rule["required_role"]}>. 😢\n'
-              continue
-
-            if not rule['can_have_warns'] and warns_of(interaction.user.id):
-              rules_not_satisfied_msg += '- Masz lub miałeś ostrzeżenia. 😒\n'
-              continue
-
-            last_use = database.data.get('ping_role_rule_last_use', {}).get(rule['id'])
-            if last_use is not None:
-              match rule['cooldown_subject']:
-                case 'user':
-                  last_use = last_use.get(interaction.user.id)
-                case 'role':
-                  last_use = last_use.get(role.id)
-                case x:
-                  assert x is None
-            if last_use is not None and (interaction.created_at - last_use).total_seconds() < parse_duration(rule['cooldown']):
-              match rule['cooldown_subject']:
-                case 'user':
-                  rules_not_satisfied_msg += '- Już pingnąłeś tę rolę niedawno. ⏱️\n'
-                case 'role':
-                  rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę rolę. ⏱️\n'
-                case None:
-                  rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę grupę ról. ⏱️\n'
-              continue
-
-            is_authorized = True
-            authorizing_rule = rule
-            break
-
-        if not is_authorized:
-          if role_is_unlockable:
-            await interaction.response.send_message(rules_not_satisfied_msg, ephemeral=True)
-          else:
-            await interaction.response.send_message('Nie można pingować tej roli… 🙄', ephemeral=True)
-          return
-
-        if not role.mentionable and not interaction.app_permissions.mention_everyone:
-          await interaction.response.send_message(f'Nie mam uprawnień, żeby spingować {role.mention}… 🧐', ephemeral=True)
-          return
-        new_msg_content = f'{role.mention} {msg.content}\n-# Wysłane przez {interaction.user.mention}'
-        if len(new_msg_content) > 2000:
-          await interaction.response.send_message('Twoja wiadomość jest zbyt długa, żebym mógł coś do niej dopisać… 😔', ephemeral=True)
-          return
-        new_msg = await msg.channel.send(
-          new_msg_content,
-          files=await asyncio.gather(*(i.to_file(use_cached=True) for i in msg.attachments)),
-          allowed_mentions=discord.AllowedMentions(roles=[role]),
-        )
-
-        database.data.setdefault('ping_role_last_use', {})[interaction.user.id] = new_msg.created_at
-        if authorizing_rule is not None:
-          match authorizing_rule['cooldown_subject']:
-            case 'user':
-              database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[interaction.user.id] = new_msg.created_at
-            case 'role':
-              database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[role.id] = new_msg.created_at
-            case None:
-              database.data.setdefault('ping_role_rule_last_use', {})[authorizing_rule['id']] = new_msg.created_at
-        database.should_save = True
-
-        try:
-          await msg.delete()
-        except discord.NotFound:
-          pass
-        except discord.Forbidden:
-          await interaction.response.send_message('Nie mam uprawnień do usuwania wiadomości… 🧐', ephemeral=True)
-          return
-
-        await interaction.response.defer()
-
-    select = discord.ui.RoleSelect()
-    modal = discord.ui.Modal(title='Dodaj ping roli do wiadomości')
-    modal.on_submit = on_submit
-    modal.add_item(discord.ui.TextDisplay('> ' + msg.content.rstrip().replace('\n', '\n> ')))
-    modal.add_item(discord.ui.Label(text='Rola, którą chcesz pingnąć', component=select))
-    modal.add_item(discord.ui.TextDisplay('Bot usunie twoją wiadomość i wyśle ją ponownie z dodanym pingiem i podpisem, że jest twoja.'))
-    await interaction.response.send_modal(modal)
-
-  @bot.tree.command(name='ping-role', description='Dodaje ping roli do twojej ostatniej wiadomości na tym kanale')
-  @discord.app_commands.guilds(config['guild'])
-  async def cmd_ping_role(interaction):
-    async for msg in interaction.channel.history(oldest_first=False):
-      if msg.author == interaction.user:
-        await ping_role(interaction, msg)
+    async with lock: # Guards against TOCTOU attacks on cooldowns.
+      last_use = database.data.get('ping_role_last_use', {}).get(interaction.user.id)
+      if last_use is not None and (interaction.created_at - last_use).total_seconds() < parse_duration(config['ping_role_cooldown']):
+        await interaction.response.send_message('Musisz zaczekać, aby móc ponownie użyć tej komendy. ⏱️', ephemeral=True)
         return
 
-    await interaction.response.send_message('Żadna z ostatnich wiadomości na tym kanale nie jest twoja… 😐', ephemeral=True)
+      is_authorized = False
+      authorizing_rule = None
+      role_is_unlockable = False
+      rules_not_satisfied_msg = f'Nie możesz pingnąć {role.mention}, ponieważ:\n'
 
-  @bot.tree.context_menu(name='Dodaj ping roli')
-  @discord.app_commands.guilds(config['guild'])
-  async def menu_ping_role(interaction, msg: discord.Message):
-    if msg.author != interaction.user:
-      await interaction.response.send_message('To nie jest twoja wiadomość… 🤨', ephemeral=True)
+      if role.mentionable or interaction.permissions.mention_everyone:
+        is_authorized = True
+      else:
+        for rule in config['ping_role_rules']:
+          if role.id not in rule['unlocked_roles']:
+            continue
+          role_is_unlockable = True
+
+          if rule['required_role'] is not None and interaction.user.get_role(rule['required_role']) is None:
+            rules_not_satisfied_msg += f'- Nie masz roli <@&{rule["required_role"]}>. 😢\n'
+            continue
+
+          if not rule['can_have_warns'] and warns_of(interaction.user.id):
+            rules_not_satisfied_msg += '- Masz lub miałeś ostrzeżenia. 😒\n'
+            continue
+
+          last_use = database.data.get('ping_role_rule_last_use', {}).get(rule['id'])
+          if last_use is not None:
+            match rule['cooldown_subject']:
+              case 'user':
+                last_use = last_use.get(interaction.user.id)
+              case 'role':
+                last_use = last_use.get(role.id)
+              case x:
+                assert x is None
+          if last_use is not None and (interaction.created_at - last_use).total_seconds() < parse_duration(rule['cooldown']):
+            match rule['cooldown_subject']:
+              case 'user':
+                rules_not_satisfied_msg += '- Już pingnąłeś tę rolę niedawno. ⏱️\n'
+              case 'role':
+                rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę rolę. ⏱️\n'
+              case None:
+                rules_not_satisfied_msg += '- Ktoś niedawno już pingnął tę grupę ról. ⏱️\n'
+            continue
+
+          is_authorized = True
+          authorizing_rule = rule
+          break
+
+      if not is_authorized:
+        if role_is_unlockable:
+          await interaction.response.send_message(rules_not_satisfied_msg, ephemeral=True)
+        else:
+          await interaction.response.send_message('Nie można pingować tej roli… 🙄', ephemeral=True)
+        return
+
+      if not role.mentionable and not interaction.app_permissions.mention_everyone:
+        await interaction.response.send_message(f'Nie mam uprawnień, żeby spingować {role.mention}… 🧐', ephemeral=True)
+        return
+      new_msg_content = f'{role.mention} {msg.content}\n-# Wysłane przez {interaction.user.mention}'
+      if len(new_msg_content) > 2000:
+        await interaction.response.send_message('Twoja wiadomość jest zbyt długa, żebym mógł coś do niej dopisać… 😔', ephemeral=True)
+        return
+      new_msg = await msg.channel.send(
+        new_msg_content,
+        files=await asyncio.gather(*(i.to_file(use_cached=True) for i in msg.attachments)),
+        allowed_mentions=discord.AllowedMentions(roles=[role]),
+      )
+
+      database.data.setdefault('ping_role_last_use', {})[interaction.user.id] = new_msg.created_at
+      if authorizing_rule is not None:
+        match authorizing_rule['cooldown_subject']:
+          case 'user':
+            database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[interaction.user.id] = new_msg.created_at
+          case 'role':
+            database.data.setdefault('ping_role_rule_last_use', {}).setdefault(authorizing_rule['id'], {})[role.id] = new_msg.created_at
+          case None:
+            database.data.setdefault('ping_role_rule_last_use', {})[authorizing_rule['id']] = new_msg.created_at
+      database.should_save = True
+
+      try:
+        await msg.delete()
+      except discord.NotFound:
+        pass
+      except discord.Forbidden:
+        await interaction.response.send_message('Nie mam uprawnień do usuwania wiadomości… 🧐', ephemeral=True)
+        return
+
+      await interaction.response.defer()
+
+  select = discord.ui.RoleSelect()
+  modal = discord.ui.Modal(title='Dodaj ping roli do wiadomości')
+  modal.on_submit = on_submit
+  modal.add_item(discord.ui.TextDisplay('> ' + msg.content.rstrip().replace('\n', '\n> ')))
+  modal.add_item(discord.ui.Label(text='Rola, którą chcesz pingnąć', component=select))
+  modal.add_item(discord.ui.TextDisplay('Bot usunie twoją wiadomość i wyśle ją ponownie z dodanym pingiem i podpisem, że jest twoja.'))
+  await interaction.response.send_modal(modal)
+
+@app_commands.command(name='ping-role', description='Dodaje ping roli do twojej ostatniej wiadomości na tym kanale')
+@app_commands.guilds(config['guild'])
+async def cmd_ping_role(interaction):
+  async for msg in interaction.channel.history(oldest_first=False):
+    if msg.author == interaction.user:
+      await ping_role(interaction, msg)
       return
 
-    await ping_role(interaction, msg)
+  await interaction.response.send_message('Żadna z ostatnich wiadomości na tym kanale nie jest twoja… 😐', ephemeral=True)
+
+@app_commands.context_menu(name='Dodaj ping roli')
+@app_commands.guilds(config['guild'])
+async def menu_ping_role(interaction, msg: discord.Message):
+  if msg.author != interaction.user:
+    await interaction.response.send_message('To nie jest twoja wiadomość… 🤨', ephemeral=True)
+    return
+
+  await ping_role(interaction, msg)

@@ -14,44 +14,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio, discord, discord.ext.commands, logging, random, threading
+# TODO: anti-nuke
+# IDEA: download source code button
+
+import asyncio, discord, logging, random, sys, threading
+from discord import app_commands
 
 import console
-from common import config, options
-from features import about_me, budzik, codeforces_handles, counting, fajne_zadanka, help_forum, lockout, misc, moderation, ping_guard, rules, sugestie, utils, warns, xp
-from features.reminders import atcoder, codeforces, youtube
+from common import config, log_exceptions, Loop, options
 
-class Client(discord.ext.commands.Bot):
-  async def setup_hook(self):
-    await about_me.setup(self)
-    await atcoder.setup(self)
-    await budzik.setup(self)
-    await codeforces.setup(self)
-    await codeforces_handles.setup(self)
-    await counting.setup(self)
-    await fajne_zadanka.setup(self)
-    await help_forum.setup(self)
-    await lockout.setup(self)
-    await misc.setup(self)
-    await moderation.setup(self)
-    await ping_guard.setup(self)
-    await rules.setup(self)
-    await sugestie.setup(self)
-    await utils.setup(self)
-    await warns.setup(self)
-    await xp.setup(self)
-    await youtube.setup(self)
-
-    if not options['dev']:
-      await self.tree.sync()
-      await self.tree.sync(guild=discord.Object(config['guild']))
-
+class Client(discord.Client):
   def __init__(self):
     intents = discord.Intents.default()
     intents.message_content = True
     intents.members = True
-    super().__init__('This parameter is irrelevant for us but we still have to put something here.', intents=intents, allowed_mentions=discord.AllowedMentions.none())
+    super().__init__(intents=intents, allowed_mentions=discord.AllowedMentions.none())
 
+    self.tree = app_commands.CommandTree(self)
+    self.event_listeners = {}
     self.check_failure_handlers = []
 
     @self.tree.error
@@ -65,11 +45,24 @@ class Client(discord.ext.commands.Bot):
     discord.ui.View.on_error = on_view_error
     discord.ui.Modal.on_error = on_modal_error
 
-  def on_check_failure(self, handler):
-    self.check_failure_handlers.append(handler)
+    self.features = []
+    for name, mod in sys.modules.items():
+      if not name.startswith('features.'):
+        continue
+      if mod.__spec__.origin is None:
+        logging.debug(f'Skipping namespace module {name!r}')
+        continue
+      self.features.append(mod)
+      if not hasattr(mod, 'feature_id'):
+        mod.feature_id = mod.__name__.removeprefix('features.')
+
+    if self.features:
+      logging.info(f'Found imported features: {sorted(i.feature_id for i in self.features)}')
+    else:
+      logging.warning('No imported features have been found')
 
   async def handle_error(self, interaction, error, log_msg):
-    if isinstance(error, discord.app_commands.CheckFailure):
+    if isinstance(error, app_commands.CheckFailure):
       for handler in self.check_failure_handlers:
         try:
           await handler(interaction, error)
@@ -86,6 +79,53 @@ class Client(discord.ext.commands.Bot):
       await send(f'Upss… Coś poszło nie tak. W dodatku nikt nie jest za to odpowiedzialny! {emoji}', ephemeral=True)
     else:
       await send(f'Upss… Coś poszło nie tak. Napisz do <@{config["server_maintainer"]}>, żeby sprawdził logi. {emoji}', ephemeral=True, allowed_mentions=discord.AllowedMentions.all())
+
+  async def setup_hook(self):
+    console.async_loop = self.loop
+
+    setup_hooks = []
+
+    for feature in self.features:
+      assert not hasattr(feature, 'bot'), feature
+      feature.bot = self
+
+      for name, value in vars(feature).items():
+        if isinstance(value, app_commands.Group):
+          self.tree.add_command(value)
+
+        elif isinstance(value, app_commands.Command):
+          if value.parent is None:
+            self.tree.add_command(value)
+
+        elif isinstance(value, console.Operation):
+          if value.scope is None:
+            value.scope = feature.feature_id.replace('_', '-')
+          console.register(value)
+
+        elif isinstance(value, Loop):
+          value.start()
+
+        elif callable(value) and getattr(value, '_is_event_listener', False):
+          event = value.__name__
+          if event == 'on_setup':
+            setup_hooks.append(value)
+          elif event == 'on_check_failure':
+            self.check_failure_handlers.append(value)
+          else:
+            self.event_listeners.setdefault(event, []).append(value)
+
+    for hook in setup_hooks:
+      await hook()
+
+    if not options['dev']:
+      logging.info('Syncing command tree')
+      await self.tree.sync()
+      await self.tree.sync(guild=discord.Object(config['guild']))
+
+  def dispatch(self, event, *args, **kwargs):
+    super().dispatch(event, *args, **kwargs)
+    for listener in self.event_listeners.get(f'on_{event}', []):
+      asyncio.create_task(log_exceptions(listener)(*args, **kwargs))
 
   async def on_ready(self):
     logging.info(f'Logged in as {str(self.user)!r}')
@@ -112,12 +152,14 @@ def run():
   except KeyboardInterrupt:
     pass
 
+@console.operation(scope='bot', desc='starts the bot')
 def start():
   if start_event.is_set():
     raise Exception('The bot is already started')
   logging.info('Starting bot')
   start_event.set()
 
+@console.operation(scope='bot', desc='stops the bot')
 def stop():
   if stop_event.is_set():
     raise Exception('The bot is already stopped')
@@ -125,7 +167,4 @@ def stop():
   stop_event.set()
   asyncio.run_coroutine_threadsafe(client.close(), client.loop)
 
-console.begin('bot')
-console.register('start', None, 'starts the bot', start)
-console.register('stop',  None, 'stops the bot',  stop)
-console.end()
+console.register(start, stop)

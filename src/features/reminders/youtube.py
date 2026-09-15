@@ -21,107 +21,109 @@ from defusedxml import ElementTree
 from itertools import groupby
 
 import database
-from common import config, log_exceptions, mention_datetime, parse_duration, sleep_until
+from common import config, event_listener, log_exceptions, mention_datetime, parse_duration, sleep_until
 from features.reminders import websub
 
-async def setup(bot):
-  @dataclass
-  class Video:
-    id: str
-    title: str
-    time: datetime
-    is_livestream: bool
+@dataclass
+class Video:
+  id: str
+  title: str
+  time: datetime
+  is_livestream: bool
 
-    @property
-    def link(self):
-      return f'https://www.youtube.com/watch?v={self.id}'
+  @property
+  def link(self):
+    return f'https://www.youtube.com/watch?v={self.id}'
 
-    @property
-    def emojiless_title(self):
-      return ' '.join(
-        ''.join(token.value for token in group).strip()
-        for is_not_emoji, group in groupby(emoji.analyze(self.title, non_emoji=True), lambda token: isinstance(token.value, str))
-        if is_not_emoji
-      )
+  @property
+  def emojiless_title(self):
+    return ' '.join(
+      ''.join(token.value for token in group).strip()
+      for is_not_emoji, group in groupby(emoji.analyze(self.title, non_emoji=True), lambda token: isinstance(token.value, str))
+      if is_not_emoji
+    )
 
-  @log_exceptions
-  async def remind(video):
-    if video.is_livestream:
-      time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
-      logging.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
-      await sleep_until(time)
-      logging.info(f'Reminding about YouTube livestream {video.id}')
+@log_exceptions
+async def remind(video):
+  if video.is_livestream:
+    time = video.time - timedelta(seconds=parse_duration(config['youtube_advance']))
+    logging.info(f'Setting reminder for YouTube livestream {video.id} for {time}')
+    await sleep_until(time)
+    logging.info(f'Reminding about YouTube livestream {video.id}')
 
-    if config['oki_channel'] is None:
+  if config['oki_channel'] is None:
+    return
+
+  mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
+  if video.is_livestream:
+    relative_time = mention_datetime(video.time, relative=True)
+    announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{video.emojiless_title}]({video.link})! 🔔'
+  else:
+    announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.emojiless_title}]({video.link})! 🔔'
+  await bot.wait_until_ready()
+  await bot.get_channel(config['oki_channel']).send(announcement, allowed_mentions=discord.AllowedMentions.all())
+
+reminders = {}
+
+async def process_videos(ids):
+  ids = list(ids)
+  logging.info(f'Processing YouTube videos: {ids!r}')
+
+  if not ids:
+    return
+
+  async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
+    response = await session.get('videos', params={'key': config['youtube_api_key'], 'part': 'snippet,liveStreamingDetails', 'id': ids})
+    if not response.ok:
+      logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
       return
+    json = await response.json()
 
-    mention = f'<@&{config["oki_role"]}>' if config['oki_role'] is not None else ''
-    if video.is_livestream:
-      relative_time = mention_datetime(video.time, relative=True)
-      announcement = f'{mention} {relative_time} na kanale OKI zaczyna się transmisja na żywo: [{video.emojiless_title}]({video.link})! 🔔'
-    else:
-      announcement = f'{mention} Na kanale OKI został opublikowany nowy film: [{video.emojiless_title}]({video.link})! 🔔'
-    await bot.wait_until_ready()
-    await bot.get_channel(config['oki_channel']).send(announcement, allowed_mentions=discord.AllowedMentions.all())
+  for i in ids:
+    try:
+      if reminders[i].cancel():
+        logging.info(f'Unset reminder for YouTube livestream {i}')
+      del reminders[i]
+    except KeyError:
+      pass
 
-  reminders = {}
-
-  async def process_videos(ids):
-    ids = list(ids)
-    logging.info(f'Processing YouTube videos: {ids!r}')
-
-    if not ids:
-      return
-
-    async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
-      response = await session.get('videos', params={'key': config['youtube_api_key'], 'part': 'snippet,liveStreamingDetails', 'id': ids})
-      if not response.ok:
-        logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
-        return
-      json = await response.json()
-
-    for i in ids:
+  videos = []
+  for entry in json['items']:
+    video = Video(entry['id'], entry['snippet']['title'], datetime.fromisoformat(entry['snippet']['publishedAt']), False)
+    if 'liveStreamingDetails' in entry:
       try:
-        if reminders[i].cancel():
-          logging.info(f'Unset reminder for YouTube livestream {i}')
-        del reminders[i]
+        video.time = datetime.fromisoformat(entry['liveStreamingDetails']['scheduledStartTime'])
+        video.is_livestream = True
       except KeyError:
-        pass
-
-    videos = []
-    for entry in json['items']:
-      video = Video(entry['id'], entry['snippet']['title'], datetime.fromisoformat(entry['snippet']['publishedAt']), False)
-      if 'liveStreamingDetails' in entry:
-        try:
-          video.time = datetime.fromisoformat(entry['liveStreamingDetails']['scheduledStartTime'])
-          video.is_livestream = True
-        except KeyError:
-          continue
-      videos.append(video)
-
-    if 'oki_last_published' not in database.data:
-      logging.info("OKI's YouTube channel has never been checked before")
-      database.data['oki_last_published'] = datetime.now().astimezone()
-      database.should_save = True
-
-    last_published = database.data['oki_last_published']
-    for video in videos:
-      if video.time <= (datetime.now().astimezone() + timedelta(seconds=parse_duration(config['youtube_advance'])) if video.is_livestream else last_published):
         continue
+    videos.append(video)
 
-      reminders[video.id] = asyncio.create_task(remind(video))
+  if 'oki_last_published' not in database.data:
+    logging.info("OKI's YouTube channel has never been checked before")
+    database.data['oki_last_published'] = datetime.now().astimezone()
+    database.should_save = True
 
-      if not video.is_livestream:
-        with database.lock:
-          database.data['oki_last_published'] = max(database.data['oki_last_published'], video.time)
-          database.should_save = True
+  last_published = database.data['oki_last_published']
+  for video in videos:
+    if video.time <= (datetime.now().astimezone() + timedelta(seconds=parse_duration(config['youtube_advance'])) if video.is_livestream else last_published):
+      continue
 
-  async def process_feed(content):
-    ns = {'atom': 'http://www.w3.org/2005/Atom', 'yt': 'http://www.youtube.com/xml/schemas/2015'}
-    await process_videos(i.find('yt:videoId', ns).text for i in ElementTree.fromstring(content).findall('atom:entry', ns))
+    reminders[video.id] = asyncio.create_task(remind(video))
 
-  websub.on_msg = lambda feed: asyncio.run_coroutine_threadsafe(process_feed(feed), bot.loop)
+    if not video.is_livestream:
+      with database.lock:
+        database.data['oki_last_published'] = max(database.data['oki_last_published'], video.time)
+        database.should_save = True
 
+async def process_feed(content):
+  ns = {'atom': 'http://www.w3.org/2005/Atom', 'yt': 'http://www.youtube.com/xml/schemas/2015'}
+  await process_videos(i.find('yt:videoId', ns).text for i in ElementTree.fromstring(content).findall('atom:entry', ns))
+
+websub.on_msg = lambda feed: asyncio.run_coroutine_threadsafe(process_feed(feed), bot.loop)
+
+# TODO: console command to do this manually
+@event_listener
+async def on_setup():
   try:
     logging.info("Downloading OKI's YouTube channel feed")
     async with aiohttp.ClientSession('https://youtube.googleapis.com/youtube/v3/') as session:
@@ -130,7 +132,7 @@ async def setup(bot):
         {'type': 'video', 'eventType': 'upcoming', 'order': 'date', 'maxResults': 50},
       ]:
         response = await session.get('search', params=params | {'channelId': config['oki_youtube'], 'key': config['youtube_api_key']})
-        if not response.ok:
+        if not response.ok: # TODO: retry on error?
           logging.error(f'YouTube API request failed with {response.status}: {await response.text()!r}')
           continue
         await process_videos(i['id']['videoId'] for i in (await response.json())['items'])

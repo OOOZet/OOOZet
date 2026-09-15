@@ -22,8 +22,6 @@ import console, database
 from common import config, log_exceptions, loop, mention_datetime, parse_duration
 from features.codeforces_handles import get_handle
 
-bot = None
-
 @dataclass
 class Contest:
   id: int
@@ -81,14 +79,14 @@ async def send_national_standings(contest):
     if json['status'] != 'OK':
       if json['comment'] == 'contestId: Rating changes are unavailable for this contest':
         if should_be_rated:
-          logging.warn(f'Failed to detect an unrated contest: {contest}')
+          logging.warning(f'Failed to detect an unrated contest: {contest}')
           should_be_rated = False
       else:
         raise Exception(f'Rating changes request failed: {json["comment"]!r}')
     elif not json['result'] and should_be_rated:
       raise Exception('Rating changes are not available yet')
     elif json['result'] and not should_be_rated:
-      logging.warn(f'Failed to detect a rated contest: {contest}')
+      logging.warning(f'Failed to detect a rated contest: {contest}')
       should_be_rated = True
     rating_changes = {i['handle']: i for i in json.get('result', [])}
 
@@ -170,71 +168,62 @@ async def send_national_standings(contest):
     await channel.send(''.join(lines[:cnt]), suppress_embeds=True)
     del lines[:cnt]
 
-async def setup(_bot):
-  global bot
-  bot = _bot
+@log_exceptions
+async def remind(contest, delay):
+  logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
+  await asyncio.sleep(delay)
+  logging.info(f'Reminding about Codeforces contest {contest.id}')
 
-  @log_exceptions
-  async def remind(contest, delay):
-    logging.info(f'Setting reminder for Codeforces contest {contest.id} for {delay} seconds')
-    await asyncio.sleep(delay)
-    logging.info(f'Reminding about Codeforces contest {contest.id}')
+  if config['codeforces_channel'] is None:
+    return
 
-    if config['codeforces_channel'] is None:
-      return
+  if not contest.is_niche and config['codeforces_role'] is not None:
+    mention = f'<@&{config["codeforces_role"]}>'
+  else:
+    mention = ''
+  relative_time = mention_datetime(contest.time, relative=True)
+  await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', allowed_mentions=discord.AllowedMentions.all(), suppress_embeds=True)
 
-    if not contest.is_niche and config['codeforces_role'] is not None:
-      mention = f'<@&{config["codeforces_role"]}>'
-    else:
-      mention = ''
-    relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['codeforces_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', allowed_mentions=discord.AllowedMentions.all(), suppress_embeds=True)
+reminders = []
+watchlist = set()
 
-  reminders = []
-  watchlist = set()
+@loop(interval=config['codeforces_contest_poll_rate'])
+async def poll():
+  logging.info('Periodically downloading Codeforces contest list')
 
-  @loop(interval=config['codeforces_contest_poll_rate'])
-  async def poll():
-    logging.info('Periodically downloading Codeforces contest list')
+  async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+    json = await (await session.get('contest.list')).json()
+  if json['status'] != 'OK':
+    logging.error(f'Codeforces contest list request failed: {json["comment"]!r}')
+    return
 
-    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
-      json = await (await session.get('contest.list')).json()
-    if json['status'] != 'OK':
-      logging.error(f'Codeforces contest list request failed: {json["comment"]!r}')
-      return
+  for task in reminders:
+    task.cancel()
+  reminders.clear()
 
-    for task in reminders:
-      task.cancel()
-    reminders.clear()
+  for entry in json['result']:
+    contest = Contest.from_json(entry)
 
-    for entry in json['result']:
-      contest = Contest.from_json(entry)
+    if entry['phase'] == 'BEFORE':
+      delay = -entry['relativeTimeSeconds'] - parse_duration(config['codeforces_advance'])
+      if delay > 0:
+        reminders.append(asyncio.create_task(remind(contest, delay)))
 
-      if entry['phase'] == 'BEFORE':
-        delay = -entry['relativeTimeSeconds'] - parse_duration(config['codeforces_advance'])
-        if delay > 0:
-          reminders.append(asyncio.create_task(remind(contest, delay)))
+    if entry['phase'] != 'FINISHED':
+      logging.info(f'Adding Codeforces contest {contest.id} to watchlist')
+      watchlist.add(contest.id)
+    elif contest.id in watchlist:
+      try:
+        await send_national_standings(contest)
+      except:
+        logging.exception('Got exception while sending Codeforces national standings')
+      else:
+        watchlist.remove(contest.id)
 
-      if entry['phase'] != 'FINISHED':
-        logging.info(f'Adding Codeforces contest {contest.id} to watchlist')
-        watchlist.add(contest.id)
-      elif contest.id in watchlist:
-        try:
-          await send_national_standings(contest)
-        except:
-          logging.exception('Got exception while sending Codeforces national standings')
-        else:
-          watchlist.remove(contest.id)
-
-  poll.start()
-
-async def send_standings(contest_id):
+@console.operation(desc='send the standings of Polish contestants in a Codeforces contest')
+async def send_standings(contest_id: int):
   async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
     json = await (await session.get('contest.standings', params={'contestId': contest_id})).json()
   if json['status'] != 'OK':
     raise Exception(f'Codeforces contest standings request failed: {json["comment"]!r}')
   await send_national_standings(Contest.from_json(json['result']['contest']))
-
-console.begin('codeforces')
-console.register('send_standings', '<id>', 'send the standings of Polish contestants in a Codeforces contest', lambda x: asyncio.run_coroutine_threadsafe(send_standings(int(x)), bot.loop).result())
-console.end()

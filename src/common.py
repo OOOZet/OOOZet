@@ -17,6 +17,7 @@
 import aiohttp, asyncio, discord, json, logging, time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from discord import app_commands
 from functools import wraps
 from typing import Callable
 from zoneinfo import ZoneInfo
@@ -313,7 +314,7 @@ def hybrid_check(*, is_consistent=False):
       if arg is None or isinstance(arg, discord.Interaction):
         return check(arg)
       else:
-        return discord.app_commands.check(check)(arg)
+        return app_commands.check(check)(arg)
     return decorator_or_pred
   return decorator
 
@@ -393,3 +394,8 @@ class Loop:
       if self.interval is not None:
         start += parse_duration(self.interval)
         await asyncio.sleep(start - time.monotonic())
+
+def event_listener(func):
+  assert not hasattr(func, '_is_event_listener')
+  func._is_event_listener = True
+  return func

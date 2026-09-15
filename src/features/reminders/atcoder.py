@@ -18,11 +18,10 @@ import aiohttp, asyncio, discord, logging, random, string
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from discord import app_commands
 
 import console, database
 from common import config, log_exceptions, loop, mention_datetime, parse_duration, sleep_until
-
-bot = None
 
 @dataclass
 class Contest:
@@ -116,145 +115,139 @@ async def send_national_standings(contest):
     await channel.send(''.join(lines[:cnt]), suppress_embeds=True)
     del lines[:cnt]
 
-async def setup(_bot):
-  global bot
-  bot = _bot
+@log_exceptions
+async def remind(contest):
+  time = contest.time - timedelta(seconds=parse_duration(config['atcoder_advance']))
+  logging.info(f'Setting reminder for AtCoder contest {contest.id} for {time}')
+  await sleep_until(time)
+  logging.info(f'Reminding about AtCoder contest {contest.id}')
 
-  @log_exceptions
-  async def remind(contest):
-    time = contest.time - timedelta(seconds=parse_duration(config['atcoder_advance']))
-    logging.info(f'Setting reminder for AtCoder contest {contest.id} for {time}')
-    await sleep_until(time)
-    logging.info(f'Reminding about AtCoder contest {contest.id}')
+  if config['atcoder_channel'] is None:
+    return
 
-    if config['atcoder_channel'] is None:
-      return
+  if not contest.is_niche and config['atcoder_role'] is not None:
+    mention = f'<@&{config["atcoder_role"]}>'
+  else:
+    mention = ''
+  relative_time = mention_datetime(contest.time, relative=True)
+  await bot.get_channel(config['atcoder_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', allowed_mentions=discord.AllowedMentions.all(), suppress_embeds=True)
 
-    if not contest.is_niche and config['atcoder_role'] is not None:
-      mention = f'<@&{config["atcoder_role"]}>'
-    else:
-      mention = ''
-    relative_time = mention_datetime(contest.time, relative=True)
-    await bot.get_channel(config['atcoder_channel']).send(f'{mention} [{contest.title}]({contest.link}) zaczyna się {relative_time}! 🔔', allowed_mentions=discord.AllowedMentions.all(), suppress_embeds=True)
+reminders = []
+watchlist = set()
 
-  reminders = []
-  watchlist = set()
+@loop(interval=config['atcoder_poll_rate'])
+async def poll():
+  logging.info('Periodically downloading AtCoder contest schedule')
 
-  @loop(interval=config['atcoder_poll_rate'])
-  async def poll():
-    logging.info('Periodically downloading AtCoder contest schedule')
+  async with aiohttp.ClientSession(raise_for_status=True) as session:
+    text = await (await session.get('https://atcoder.jp/contests/')).text()
+  html = BeautifulSoup(text, 'lxml')
+  entries = html.find(id='contest-table-upcoming').tbody.find_all('tr')
+  entries += html.find(id='contest-table-recent').tbody.find_all('tr')
 
-    async with aiohttp.ClientSession(raise_for_status=True) as session:
-      text = await (await session.get('https://atcoder.jp/contests/')).text()
-    html = BeautifulSoup(text, 'lxml')
-    entries = html.find(id='contest-table-upcoming').tbody.find_all('tr')
-    entries += html.find(id='contest-table-recent').tbody.find_all('tr')
+  for task in reminders:
+    task.cancel()
+  reminders.clear()
 
-    for task in reminders:
-      task.cancel()
-    reminders.clear()
+  for entry in entries:
+    entry = entry.find_all('td')
+    contest = Contest(
+      entry[1].a['href'].removeprefix('/contests/'),
+      entry[1].a.text.strip(),
+      datetime.fromisoformat(entry[0].text),
+    )
 
-    for entry in entries:
-      entry = entry.find_all('td')
-      contest = Contest(
-        entry[1].a['href'].removeprefix('/contests/'),
-        entry[1].a.text.strip(),
-        datetime.fromisoformat(entry[0].text),
-      )
+    if datetime.now().astimezone() < contest.time - timedelta(seconds=parse_duration(config['atcoder_advance'])):
+      reminders.append(asyncio.create_task(remind(contest)))
 
-      if datetime.now().astimezone() < contest.time - timedelta(seconds=parse_duration(config['atcoder_advance'])):
-        reminders.append(asyncio.create_task(remind(contest)))
+      logging.info(f'Adding AtCoder contest {contest.id} to watchlist')
+      watchlist.add(contest.id)
 
-        logging.info(f'Adding AtCoder contest {contest.id} to watchlist')
-        watchlist.add(contest.id)
-
-      elif contest.id in watchlist:
-        try:
-          await send_national_standings(contest)
-        except:
-          logging.exception('Got exception while sending AtCoder national standings')
-        else:
-          watchlist.remove(contest.id)
-
-  poll.start()
-
-  atcoder = discord.app_commands.Group(name='atcoder', description='Komendy do nicków na AtCoder')
-  bot.tree.add_command(atcoder)
-
-  # TODO: handle stealing others' handles properly
-  @atcoder.command(name='set', description='Zapamiętuje twój nick na AtCoder')
-  async def set_(interaction, handle: str):
-    logging.info(f'{interaction.user.id} requested to set their AtCoder handle to {handle!r}')
-
-    if any(i not in string.ascii_letters + string.digits + '_' for i in handle):
-      await interaction.response.send_message('Taki nick zawiera niedozwolone znaki… 🤨', ephemeral=True)
-      return
-
-    async with aiohttp.ClientSession() as session:
-      response = await session.get(f'https://atcoder.jp/users/{handle}')
-    if response.status == 404:
-      await interaction.response.send_message('Nie ma na AtCoder konta o takim nicku… 🤨', ephemeral=True)
-      return
-    response.raise_for_status()
-
-    a = random.choice(['Agenci', 'Legendy', 'Mistrzowie', 'Pogromcy', 'Przyjaciele', 'Zaklinacze', 'Zbawiciele', 'Zjadacze'])
-    b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
-
-    # U+202F is not a word break and allows both words to be selected at once.
-    await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoją przynależność](https://atcoder.jp/settings) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True, suppress_embeds=True)
-    await asyncio.sleep(3 * 60)
-
-    async with aiohttp.ClientSession(raise_for_status=True) as session:
-      text = await (await session.get(f'https://atcoder.jp/users/{handle}')).text()
-    html = BeautifulSoup(text, 'lxml')
-    handle = html.find(class_='username').text.strip()
-    try:
-      read = next(i.td.text for i in html.find_all('tr') if i.th.text == 'Affiliation')
-    except StopIteration:
-      read = None
-
-    if read is not None and ''.join(read.split()) == a + b:
-      logging.info(f'{interaction.user.id} has successfully set their AtCoder handle to {handle!r}')
-      database.data.setdefault('atcoder_handles', {})[interaction.user.id] = handle
-      database.should_save = True
-      await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na AtCoder na `{handle}`! 🥳\n')
-    else:
-      logging.info(f'{interaction.user.id} failed to verify their AtCoder handle ({read!r} != {a!r} & {b!r})')
-      if read is None:
-        read = 'end of file'
-      elif '`' in read:
-        read = 'stringa z grawisami (*ty hakierze*)'
+    elif contest.id in watchlist:
+      try:
+        await send_national_standings(contest)
+      except:
+        logging.exception('Got exception while sending AtCoder national standings')
       else:
-        read = f'`{read}`'
-      await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. Oczekiwano `{a} {b}`, wczytano {read}. 😕')
+        watchlist.remove(contest.id)
 
-  async def get(interaction, user):
-    handle = database.data.get('atcoder_handles', {}).get(user.id)
-    if handle is None:
-      await interaction.response.send_message(f'{user.mention} nie podzielił się jeszcze swoim nickiem na AtCoder. 🕵️', ephemeral=True)
+atcoder = app_commands.Group(name='atcoder', description='Komendy do nicków na AtCoder')
+
+# TODO: handle stealing others' handles properly
+@atcoder.command(name='set', description='Zapamiętuje twój nick na AtCoder')
+async def set_(interaction, handle: str):
+  logging.info(f'{interaction.user.id} requested to set their AtCoder handle to {handle!r}')
+
+  if any(i not in string.ascii_letters + string.digits + '_' for i in handle):
+    await interaction.response.send_message('Taki nick zawiera niedozwolone znaki… 🤨', ephemeral=True)
+    return
+
+  async with aiohttp.ClientSession() as session:
+    response = await session.get(f'https://atcoder.jp/users/{handle}')
+  if response.status == 404:
+    await interaction.response.send_message('Nie ma na AtCoder konta o takim nicku… 🤨', ephemeral=True)
+    return
+  response.raise_for_status()
+
+  a = random.choice(['Agenci', 'Legendy', 'Mistrzowie', 'Pogromcy', 'Przyjaciele', 'Zaklinacze', 'Zbawiciele', 'Zjadacze'])
+  b = random.choice(['USB', 'Obozów', 'Heur', 'Krokietów', 'Gąsienic', 'Szczurów', 'Kontestów', 'Zadań'])
+
+  # U+202F is not a word break and allows both words to be selected at once.
+  await interaction.response.send_message(f'Aby zweryfikować przynależność tego konta do ciebie, [ustaw swoją przynależność](https://atcoder.jp/settings) na `{a}\u202f{b}` w ciągu **{3 * 60} sekund** i czekaj aż do upłynięcia reszty czasu. 🥺', ephemeral=True, suppress_embeds=True)
+  await asyncio.sleep(3 * 60)
+
+  async with aiohttp.ClientSession(raise_for_status=True) as session:
+    text = await (await session.get(f'https://atcoder.jp/users/{handle}')).text()
+  html = BeautifulSoup(text, 'lxml')
+  handle = html.find(class_='username').text.strip()
+  try:
+    read = next(i.td.text for i in html.find_all('tr') if i.th.text == 'Affiliation')
+  except StopIteration:
+    read = None
+
+  if read is not None and ''.join(read.split()) == a + b:
+    logging.info(f'{interaction.user.id} has successfully set their AtCoder handle to {handle!r}')
+    database.data.setdefault('atcoder_handles', {})[interaction.user.id] = handle
+    database.should_save = True
+    await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na AtCoder na `{handle}`! 🥳\n')
+  else:
+    logging.info(f'{interaction.user.id} failed to verify their AtCoder handle ({read!r} != {a!r} & {b!r})')
+    if read is None:
+      read = 'end of file'
+    elif '`' in read:
+      read = 'stringa z grawisami (*ty hakierze*)'
     else:
-      await interaction.response.send_message(f'{user.mention} ma nick [`{handle}`](https://atcoder.jp/users/{handle}) na AtCoder. 🕵️', ephemeral=True, suppress_embeds=True)
+      read = f'`{read}`'
+    await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. Oczekiwano `{a} {b}`, wczytano {read}. 😕')
 
-  @atcoder.command(name='get', description='Pokazuje nick użytkownika na AtCoder')
-  async def cmd_get(interaction, user: discord.User | None):
-    await get(interaction, interaction.user if user is None else user)
+async def get(interaction, user):
+  handle = database.data.get('atcoder_handles', {}).get(user.id)
+  if handle is None:
+    await interaction.response.send_message(f'{user.mention} nie podzielił się jeszcze swoim nickiem na AtCoder. 🕵️', ephemeral=True)
+  else:
+    await interaction.response.send_message(f'{user.mention} ma nick [`{handle}`](https://atcoder.jp/users/{handle}) na AtCoder. 🕵️', ephemeral=True, suppress_embeds=True)
 
-  @bot.tree.context_menu(name='Pokaż nick na AtCoder')
-  async def menu_get(interaction, user: discord.User):
-    await get(interaction, user)
+@atcoder.command(name='get', description='Pokazuje nick użytkownika na AtCoder')
+async def cmd_get(interaction, user: discord.User | None):
+  await get(interaction, interaction.user if user is None else user)
 
-  @atcoder.command(description='Zapomina twój nick na AtCoder')
-  async def unset(interaction):
-    try:
-      del database.data['atcoder_handles'][interaction.user.id]
-      database.should_save = True
-    except KeyError:
-      await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na AtCoder… 🤨', ephemeral=True)
-    else:
-      logging.info(f'{interaction.user.id} has unset their AtCoder handle')
-      await interaction.response.send_message('Pomyślnie zapomniano twój nick na AtCoder. 🫡', ephemeral=True)
+@app_commands.context_menu(name='Pokaż nick na AtCoder')
+async def menu_get(interaction, user: discord.User):
+  await get(interaction, user)
 
-async def send_standings(contest_id):
+@atcoder.command(description='Zapomina twój nick na AtCoder')
+async def unset(interaction):
+  try:
+    del database.data['atcoder_handles'][interaction.user.id]
+    database.should_save = True
+  except KeyError:
+    await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na AtCoder… 🤨', ephemeral=True)
+  else:
+    logging.info(f'{interaction.user.id} has unset their AtCoder handle')
+    await interaction.response.send_message('Pomyślnie zapomniano twój nick na AtCoder. 🫡', ephemeral=True)
+
+@console.operation(desc='send the standings of Polish contestants in an AtCoder contest')
+async def send_standings(contest_id: int):
   async with aiohttp.ClientSession(raise_for_status=True) as session:
     html = BeautifulSoup(await (await session.get(f'https://atcoder.jp/contests/{contest_id}')).text(), 'lxml')
   await send_national_standings(Contest(
@@ -262,7 +255,3 @@ async def send_standings(contest_id):
     html.find(class_='contest-title').text.strip(),
     datetime.fromisoformat(html.find(class_='contest-duration').time.text),
   ))
-
-console.begin('atcoder')
-console.register('send_standings', '<id>', 'send the standings of Polish contestants in an AtCoder contest', lambda x: asyncio.run_coroutine_threadsafe(send_standings(x), bot.loop).result())
-console.end()

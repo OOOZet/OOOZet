@@ -17,13 +17,13 @@
 import aiohttp, asyncio, discord, logging, random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from discord import app_commands
 from math import ceil
 
 import console, database
-from common import config, log_exceptions, loop, mention_datetime, parse_duration, sleep_until
+from common import config, event_listener, log_exceptions, loop, mention_datetime, parse_duration, sleep_until
 from features.codeforces_handles import get_handle
 
-bot = None
 lock = asyncio.Lock()
 problemset = {}
 filtered_problemset = {}
@@ -38,24 +38,24 @@ async def can_message(user):
     return True
   assert False
 
-class InviteSelfError(discord.app_commands.CheckFailure):
+class InviteSelfError(app_commands.CheckFailure):
   pass
 
-class NoCodeforcesHandleBothError(discord.app_commands.CheckFailure):
+class NoCodeforcesHandleBothError(app_commands.CheckFailure):
   pass
 
 @dataclass
-class NoCodeforcesHandleError(discord.app_commands.CheckFailure):
+class NoCodeforcesHandleError(app_commands.CheckFailure):
   user: discord.User
 
-class SendingMultipleInvitesError(discord.app_commands.CheckFailure):
+class SendingMultipleInvitesError(app_commands.CheckFailure):
   pass
 
-class InvitingWhileInDuelError(discord.app_commands.CheckFailure):
+class InvitingWhileInDuelError(app_commands.CheckFailure):
   pass
 
 @dataclass
-class CannotMessageError(discord.app_commands.CheckFailure):
+class CannotMessageError(app_commands.CheckFailure):
   user: discord.User
 
 def check_invite_preconditions(interaction, invitee):
@@ -370,139 +370,130 @@ class Invite:
       await self.interaction.edit_original_response(content=f'{self.invitee.mention} nie przyjął twojego wyzwania… 😔')
       await self.msg.edit(view=None)
 
-async def setup(_bot):
-  global bot
-  bot = _bot
+@event_listener
+async def on_check_failure(interaction, error):
+  match error:
+    case InviteSelfError():
+      await interaction.response.send_message('Nie możesz pojedynkować się z samym sobą… 🤨', ephemeral=True)
+    case NoCodeforcesHandleBothError():
+      await interaction.response.send_message('Oboje musicie podać mi swój nick na Codeforces za pomocą komendy `/codeforces set`, żeby móc zagrać w lockout. 😊', ephemeral=True)
+    case NoCodeforcesHandleError(user):
+      if user == interaction.user:
+        await interaction.response.send_message('Musisz podać mi swój nick na Codeforces za pomocą komendy `/codeforces set`, żeby móc zagrać w lockout. 😊', ephemeral=True)
+      else:
+        await interaction.response.send_message(f'{user.mention} musi podać mi swój nick na Codeforces za pomocą komendy `/codeforces set`, żeby móc zagrać w lockout. 😊', ephemeral=True)
+    case SendingMultipleInvitesError():
+      await interaction.response.send_message('Nie możesz wyzywać na pojedynek wielu użytkowników na raz. 🤨', ephemeral=True)
+    case InvitingWhileInDuelError():
+      await interaction.response.send_message('Nie możesz wyzywać innych na pojedynek, gdy już jesteś w jednym pojedynku. 😐', ephemeral=True)
+    case CannotMessageError(user):
+      if user == interaction.user:
+        await interaction.response.send_message('Nie mogę wysłać wiadomości do ciebie. Sprawdź swoje ustawienia otrzymywania wiadomości prywatnych od innych. 🥺', ephemeral=True)
+      else:
+        await interaction.response.send_message(f'Nie mogę wysłać wiadomości do {user.mention}. Poproś go o sprawdzenie swoich ustawień otrzymywania wiadomości prywatnych od innych. 🥺', ephemeral=True)
+    case _:
+      raise
 
-  @bot.on_check_failure
-  async def on_check_failure(interaction, error):
-    match error:
-      case InviteSelfError():
-        await interaction.response.send_message('Nie możesz pojedynkować się z samym sobą… 🤨', ephemeral=True)
-      case NoCodeforcesHandleBothError():
-        await interaction.response.send_message('Oboje musicie podać mi swój nick na Codeforces za pomocą komendy `/codeforces set`, żeby móc zagrać w lockout. 😊', ephemeral=True)
-      case NoCodeforcesHandleError(user):
-        if user == interaction.user:
-          await interaction.response.send_message('Musisz podać mi swój nick na Codeforces za pomocą komendy `/codeforces set`, żeby móc zagrać w lockout. 😊', ephemeral=True)
-        else:
-          await interaction.response.send_message(f'{user.mention} musi podać mi swój nick na Codeforces za pomocą komendy `/codeforces set`, żeby móc zagrać w lockout. 😊', ephemeral=True)
-      case SendingMultipleInvitesError():
-        await interaction.response.send_message('Nie możesz wyzywać na pojedynek wielu użytkowników na raz. 🤨', ephemeral=True)
-      case InvitingWhileInDuelError():
-        await interaction.response.send_message('Nie możesz wyzywać innych na pojedynek, gdy już jesteś w jednym pojedynku. 😐', ephemeral=True)
-      case CannotMessageError(user):
-        if user == interaction.user:
-          await interaction.response.send_message('Nie mogę wysłać wiadomości do ciebie. Sprawdź swoje ustawienia otrzymywania wiadomości prywatnych od innych. 🥺', ephemeral=True)
-        else:
-          await interaction.response.send_message(f'Nie mogę wysłać wiadomości do {user.mention}. Poproś go o sprawdzenie swoich ustawień otrzymywania wiadomości prywatnych od innych. 🥺', ephemeral=True)
-      case _:
-        raise
+@event_listener
+async def on_ready():
+  for duel in database.data.get('lockout_duels', []):
+    view = duel_view(duel)
+    if view is not None:
+      for chan, msg in duel['messages']:
+        bot.add_view(view, message_id=msg)
+    if 'last_update' not in duel or duel['last_update'] <= duel['end']:
+      asyncio.create_task(time_duel_update(duel))
+  logging.info('Lockout is ready')
 
-  @bot.listen()
-  async def on_ready():
-    for duel in database.data.get('lockout_duels', []):
-      view = duel_view(duel)
-      if view is not None:
-        for chan, msg in duel['messages']:
-          bot.add_view(view, message_id=msg)
-      if 'last_update' not in duel or duel['last_update'] <= duel['end']:
-        asyncio.create_task(time_duel_update(duel))
-    logging.info('Lockout is ready')
+lockout = app_commands.Group(name='lockout', description='Komendy do lockouta')
 
-  lockout = discord.app_commands.Group(name='lockout', description='Komendy do lockouta')
-  bot.tree.add_command(lockout)
+async def challenge(interaction, user):
+  check_invite_preconditions(interaction, user)
+  await check_messageabilty(interaction, user)
 
-  async def challenge(interaction, user):
-    check_invite_preconditions(interaction, user)
-    await check_messageabilty(interaction, user)
-
-    async def on_submit(interaction2):
-      settings = {
-        'taskc': int(taskc.values[0]),
-        'duration': parse_duration(duration.values[0]),
-      }
-      try:
-        settings['min_rating'] = int(min_rating.value)
-        settings['max_rating'] = int(max_rating.value)
-      except ValueError:
-        await interaction2.response.send_message('Trudność zadania musi być liczbą… 🤨', ephemeral=True)
-        return
-      if settings['min_rating'] > settings['max_rating']:
-        await interaction2.response.send_message('Przedział trudności zadań nie może być pusty… 😐', ephemeral=True)
-        return
-
-      await Invite(interaction2, user, settings).finish_interaction()
-
-    taskc = discord.ui.Select()
-    for count in config['lockout_taskc_choices']:
-      taskc.add_option(label=count, value=count)
-    duration = discord.ui.Select()
-    for label, value in config['lockout_duration_choices']:
-      duration.add_option(label=label, value=value)
-    min_rating = discord.ui.TextInput(default=config['lockout_min_rating_default'], max_length=4)
-    max_rating = discord.ui.TextInput(default=config['lockout_max_rating_default'], max_length=4)
-
-    modal = discord.ui.Modal(title=f'Wyzwij {user} na pojedynek w lockout')
-    modal.on_submit = on_submit
-    modal.add_item(discord.ui.TextDisplay(
-      'Lockout to gra dwuosobowa, w której obaj gracze dostają do rozwiązania '
-      'na czas losowy zestaw zadań z Codeforces. Punkty za zadanie dostaje '
-      'ten, który rozwiązał je jako pierwszy.',
-    ))
-    modal.add_item(discord.ui.Label(text='Liczba zadań', component=taskc))
-    modal.add_item(discord.ui.Label(text='Czas trwania pojedynku', component=duration))
-    modal.add_item(discord.ui.Label(text='Minimalna trudność zadań', component=min_rating))
-    modal.add_item(discord.ui.Label(text='Maksymalna trudność zadań', component=max_rating))
-    await interaction.response.send_modal(modal)
-
-  @lockout.command(name='challenge', description='Wyzywa na pojedynek w lockout')
-  async def cmd_challenge(interaction, user: discord.User):
-    await challenge(interaction, user)
-
-  @bot.tree.context_menu(name='Zagraj w lockout')
-  async def menu_challenge(interaction, user: discord.User):
-    await challenge(interaction, user)
-
-  @loop(interval=config['codeforces_problemset_poll_rate'])
-  async def poll():
-    logging.info('Periodically downloading Codeforces problemset and contest list')
-
-    async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
-      json = await (await session.get('problemset.problems')).json()
-      contests = await (await session.get('contest.list')).json()
-    if json['status'] != 'OK':
-      logging.error(f'Codeforces problemset request failed: {json["comment"]!r}')
-      return
-    if contests['status'] != 'OK':
-      logging.error(f'Codeforces contest list request failed: {contests["comment"]!r}')
-      return
-
-    global filtered_problemset, problemset
-    new = {}
-    for i in json['result']['problems']:
-      new.setdefault(problem_id(i), {}).update(i)
-    for i in json['result']['problemStatistics']:
-      new.setdefault(problem_id(i), {}).update(i)
-    problemset = new
-    contests = {contest['id']: contest for contest in contests['result']}
-    filtered_problemset = {
-      i: problem
-      for i, problem in new.items()
-      if 'rating' in problem and any(keyword in contests[problem['contestId']]['name'] for keyword in config['lockout_contest_whitelist'])
+  async def on_submit(interaction2):
+    settings = {
+      'taskc': int(taskc.values[0]),
+      'duration': parse_duration(duration.values[0]),
     }
+    try:
+      settings['min_rating'] = int(min_rating.value)
+      settings['max_rating'] = int(max_rating.value)
+    except ValueError:
+      await interaction2.response.send_message('Trudność zadania musi być liczbą… 🤨', ephemeral=True)
+      return
+    if settings['min_rating'] > settings['max_rating']:
+      await interaction2.response.send_message('Przedział trudności zadań nie może być pusty… 😐', ephemeral=True)
+      return
 
-  poll.start()
+    await Invite(interaction2, user, settings).finish_interaction()
 
+  taskc = discord.ui.Select()
+  for count in config['lockout_taskc_choices']:
+    taskc.add_option(label=count, value=count)
+  duration = discord.ui.Select()
+  for label, value in config['lockout_duration_choices']:
+    duration.add_option(label=label, value=value)
+  min_rating = discord.ui.TextInput(default=config['lockout_min_rating_default'], max_length=4)
+  max_rating = discord.ui.TextInput(default=config['lockout_max_rating_default'], max_length=4)
+
+  modal = discord.ui.Modal(title=f'Wyzwij {user} na pojedynek w lockout')
+  modal.on_submit = on_submit
+  modal.add_item(discord.ui.TextDisplay(
+    'Lockout to gra dwuosobowa, w której obaj gracze dostają do rozwiązania '
+    'na czas losowy zestaw zadań z Codeforces. Punkty za zadanie dostaje '
+    'ten, który rozwiązał je jako pierwszy.',
+  ))
+  modal.add_item(discord.ui.Label(text='Liczba zadań', component=taskc))
+  modal.add_item(discord.ui.Label(text='Czas trwania pojedynku', component=duration))
+  modal.add_item(discord.ui.Label(text='Minimalna trudność zadań', component=min_rating))
+  modal.add_item(discord.ui.Label(text='Maksymalna trudność zadań', component=max_rating))
+  await interaction.response.send_modal(modal)
+
+@lockout.command(name='challenge', description='Wyzywa na pojedynek w lockout')
+async def cmd_challenge(interaction, user: discord.User):
+  await challenge(interaction, user)
+
+@app_commands.context_menu(name='Zagraj w lockout')
+async def menu_challenge(interaction, user: discord.User):
+  await challenge(interaction, user)
+
+@loop(interval=config['codeforces_problemset_poll_rate'])
+async def poll():
+  logging.info('Periodically downloading Codeforces problemset and contest list')
+
+  async with aiohttp.ClientSession('https://codeforces.com/api/') as session:
+    json = await (await session.get('problemset.problems')).json()
+    contests = await (await session.get('contest.list')).json()
+  if json['status'] != 'OK':
+    logging.error(f'Codeforces problemset request failed: {json["comment"]!r}')
+    return
+  if contests['status'] != 'OK':
+    logging.error(f'Codeforces contest list request failed: {contests["comment"]!r}')
+    return
+
+  global filtered_problemset, problemset
+  new = {}
+  for i in json['result']['problems']:
+    new.setdefault(problem_id(i), {}).update(i)
+  for i in json['result']['problemStatistics']:
+    new.setdefault(problem_id(i), {}).update(i)
+  problemset = new
+  contests = {contest['id']: contest for contest in contests['result']}
+  filtered_problemset = {
+    i: problem
+    for i, problem in new.items()
+    if 'rating' in problem and any(keyword in contests[problem['contestId']]['name'] for keyword in config['lockout_contest_whitelist'])
+  }
+
+@console.operation(desc='lists all active duels and invites')
 def status():
   result = ''
   for invite in invites:
     result += f'invite from {invite.inviter.id} to {invite.invitee.id} expires {invite.timeout_time}\n'
   for duel in database.data.get('lockout_duels', []):
-    result += f'duel between {duel["players"]} ends {duel["end"]}\n'
+    if datetime.now().astimezone() < duel['end']:
+      result += f'duel between {duel["players"]} ends {duel["end"]}\n'
   if not result:
     result = 'no active duels nor invites'
   return result
-
-console.begin('lockout')
-console.register('status', None, 'lists all active duels and invites', status)
-console.end()

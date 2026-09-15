@@ -27,6 +27,7 @@ on_msg = None # Override this.
 
 server = None
 
+@console.operation(desc='starts the WebSub server')
 def start():
   logging.info('Starting WebSub server')
 
@@ -35,6 +36,7 @@ def start():
   server.async_serve_forever()
   server.subscribe()
 
+@console.operation(desc='stops the WebSub server')
 def stop():
   logging.info('Stopping WebSub server')
 
@@ -180,7 +182,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
       logging.info('Received WebSub message')
 
     if algorithm not in {'sha1', 'sha256', 'sha384', 'sha512'}: # New algorithms may be added in the future.
-      logging.warn(f'Unknown WebSub signature algorithm: {algorithm!r}')
+      logging.warning(f'Unknown WebSub signature algorithm: {algorithm!r}')
       self.send_error(501)
       return
 
@@ -212,16 +214,17 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
       return
 
     if on_msg is None:
-      logging.warn('No WebSub message handler has been provided')
+      logging.warning('No WebSub message handler has been provided')
     else:
       on_msg(content.decode())
 
   def log_message(self, format, *args): # The person who came up with this is insane.
     logging.info(f'WebSub server says {format % args!r}')
 
-console.begin('websub')
-console.register('start',       None, 'starts the WebSub server',       start)
-console.register('stop',        None, 'stops the WebSub server',        stop)
-console.register('subscribe',   None, 'subscribes the WebSub server',   lambda: server.subscribe())
-console.register('unsubscribe', None, 'unsubscribes the WebSub server', lambda: server.unsubscribe())
-console.end()
+@console.operation(desc='subscribes the WebSub server')
+def subscribe():
+  server.subscribe()
+
+@console.operation(desc='unsubscribes the WebSub server')
+def unsubscribe():
+  server.unsubscribe()

@@ -27,6 +27,7 @@ data = None
 should_save = False
 lock = threading.RLock()
 
+@console.operation(scope='database', desc='loads the database from file')
 def load():
   logging.info('Loading database')
   with lock:
@@ -51,6 +52,7 @@ def load():
     global should_save
     should_save = False
 
+@console.operation(scope='database', desc='saves the database to file')
 def save():
   logging.info('Saving database')
   with lock:
@@ -80,6 +82,7 @@ def save():
 autosave_thread = None
 autosave_stop = None
 
+@console.operation(scope='database', desc='starts the database')
 def start():
   global autosave_thread, autosave_stop
   if autosave_thread is not None or autosave_stop is not None:
@@ -98,6 +101,7 @@ def start():
   autosave_thread = threading.Thread(target=autosave)
   autosave_thread.start()
 
+@console.operation(scope='database', desc='stops the database')
 def stop():
   global autosave_thread, autosave_stop
   if autosave_thread is None or autosave_stop is None:
@@ -109,10 +113,8 @@ def stop():
   autosave_stop = None
   autosave_thread = None
 
-console.begin('database')
-console.register('data',  None, 'prints the database',          lambda: data)
-console.register('load',  None, 'loads the database from file', load)
-console.register('save',  None, 'saves the database to file',   save)
-console.register('start', None, 'starts the database',          start)
-console.register('stop',  None, 'stops the database',           stop)
-console.end()
+@console.operation(scope='database', name='data', desc='prints the database')
+def op_data():
+  return data
+
+console.register(op_data, load, save, start, stop)

@@ -16,17 +16,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# TODO: move all source code to src/
-# IDEA: a proper feature system with dependency resolving, controlled
-#       inter-feature communication, decorators for class-level definitions
-#       of console commands and check failure handlers, and automatic
-#       registration of tree commands and startup of loops
-
-import discord, sys
+import discord, logging, sys
 
 import bot, common, console, database
 from common import options
-from features.reminders import websub
 
 if __name__ == '__main__':
   i = 0
@@ -48,6 +41,11 @@ if __name__ == '__main__':
   common.load_config()
   console.start()
   database.start()
+
+  # We delay the importing of features because they usually require the config.
+  logging.info('Importing features')
+  import features.all
+  from features.reminders import websub
   websub.start()
 
   bot.run()

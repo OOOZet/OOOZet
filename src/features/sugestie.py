@@ -18,15 +18,14 @@ import asyncio, discord, logging
 from base64 import b64decode, b64encode
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from discord import app_commands
 from enum import auto, Enum
 from io import BytesIO
 from mimetypes import guess_extension
 
 import console, database
-from common import config, debacktick, format_datetime, hybrid_check, limit_len, log_exceptions, mention_datetime, mention_message, parse_duration, select_view, sleep_until
+from common import config, debacktick, event_listener, format_datetime, hybrid_check, limit_len, log_exceptions, mention_datetime, mention_message, parse_duration, select_view, sleep_until
 from features.utils import check_staff, is_staff
-
-bot = None
 
 def is_ongoing(sugestia):
   return 'annulled' not in sugestia and 'outcome' not in sugestia
@@ -300,7 +299,7 @@ async def update(sugestia):
   try:
     msg = await bot.get_channel(sugestia['channel']).fetch_message(sugestia['id'])
   except discord.errors.NotFound:
-    logging.warn(f'Sugestia {sugestia["id"]} is missing')
+    logging.warning(f'Sugestia {sugestia["id"]} is missing')
     return
 
   buttonc_before = sum(len(i.children) for i in msg.components)
@@ -389,7 +388,7 @@ async def clean():
       asyncio.create_task(time_updates(sugestia))
 
 @dataclass
-class NoSugestieError(discord.app_commands.CheckFailure):
+class NoSugestieError(app_commands.CheckFailure):
   class Filter(Enum):
     Any = auto()
     Pending = auto()
@@ -417,216 +416,208 @@ def check_eraseable(interaction):
   if not any(map(is_eraseable_in(interaction), database.data.get('sugestie', []))):
     raise NoSugestieError(NoSugestieError.Filter.Eraseable)
 
-async def setup(_bot):
-  global bot
-  bot = _bot
+@event_listener
+async def on_check_failure(interaction, error):
+  if isinstance(error, NoSugestieError):
+    match error.filter:
+      case error.Filter.Any:
+        await interaction.response.send_message('Nie zostały jeszcze przedłożone żadne sugestie… 🤨', ephemeral=True)
+      case error.Filter.Pending:
+        await interaction.response.send_message('Nie ma żadnych sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
+      case error.Filter.Annullable:
+        await interaction.response.send_message('Nie ma żadnych sugestii, które możesz unieważnić… 🤨', ephemeral=True)
+      case error.Filter.Eraseable:
+        await interaction.response.send_message('Nie ma żadnych sugestii, które możesz usunąć… 🤨', ephemeral=True)
+  else:
+    raise
 
-  @bot.on_check_failure
-  async def on_check_failure(interaction, error):
-    if isinstance(error, NoSugestieError):
-      match error.filter:
-        case error.Filter.Any:
-          await interaction.response.send_message('Nie zostały jeszcze przedłożone żadne sugestie… 🤨', ephemeral=True)
-        case error.Filter.Pending:
-          await interaction.response.send_message('Nie ma żadnych sugestii, które zostały jeszcze do wykonania… 🤨', ephemeral=True)
-        case error.Filter.Annullable:
-          await interaction.response.send_message('Nie ma żadnych sugestii, które możesz unieważnić… 🤨', ephemeral=True)
-        case error.Filter.Eraseable:
-          await interaction.response.send_message('Nie ma żadnych sugestii, które możesz usunąć… 🤨', ephemeral=True)
+@event_listener
+async def on_ready():
+  logging.info('Cleaning #sugestie')
+  await clean()
+
+  for sugestia in database.data.get('sugestie', []):
+    bot.add_view(view_for(sugestia), message_id=sugestia['id'])
+    if is_ongoing(sugestia):
+      asyncio.create_task(time_updates(sugestia))
+
+  logging.info('Sugestie is ready')
+
+@event_listener
+async def on_message(msg):
+  if msg.channel.id == config['sugestie_channel'] and msg.author != bot.user:
+    logging.info('Cleaning #sugestie after a new message')
+    await clean() # Same pattern as in counting.py
+
+sugestie = app_commands.Group(name='sugestie', description='Komendy do sugestii', guild_ids=[config['guild']])
+
+@sugestie.command(description='Wyświetla sugestię')
+@check_any
+async def show(interaction):
+  async def callback(interaction2, choice):
+    sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
+    embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+    author = await bot.fetch_user(sugestia['author'])
+    embed.set_footer(text=str(author), icon_url=author.display_avatar.url)
+    if sugestia['image'] is None:
+      await interaction2.response.send_message(embed=embed, ephemeral=True)
     else:
-      raise
+      filename = 'sugestia' + guess_extension(sugestia['image']['format'])
+      embed.set_image(url=f'attachment://{filename}')
+      await interaction2.response.send_message(embed=embed, file=discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename), ephemeral=True)
 
-  @bot.listen()
-  async def on_ready():
-    logging.info('Cleaning #sugestie')
-    await clean()
+  await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
+    [
+      discord.SelectOption(
+        label=limit_len(sugestia['text']),
+        value=sugestia['id'],
+        description=format_datetime(sugestia['time']),
+        emoji=emoji_status_of(sugestia),
+      )
+      for sugestia in reversed(database.data['sugestie'])
+    ],
+    callback,
+    interaction.user,
+  ), ephemeral=True)
 
-    for sugestia in database.data.get('sugestie', []):
-      bot.add_view(view_for(sugestia), message_id=sugestia['id'])
-      if is_ongoing(sugestia):
-        asyncio.create_task(time_updates(sugestia))
+@sugestie.command(description='Wyświetla sugestię czekająca na wykonanie')
+@check_pending
+async def pending(interaction):
+  async def callback(interaction2, choice):
+    sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
+    embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
+    author = await bot.fetch_user(sugestia['author'])
+    embed.set_footer(text=str(author), icon_url=author.display_avatar.url)
+    if sugestia['image'] is None:
+      await interaction2.response.send_message(embed=embed, ephemeral=True)
+    else:
+      filename = 'sugestia' + guess_extension(sugestia['image']['format'])
+      embed.set_image(url=f'attachment://{filename}')
+      await interaction2.response.send_message(embed=embed, file=discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename), ephemeral=True)
 
-    logging.info('Sugestie is ready')
+  await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
+    [
+      discord.SelectOption(
+        label=limit_len(sugestia['text']),
+        value=sugestia['id'],
+        description=format_datetime(sugestia['time']),
+        emoji=emoji_status_of(sugestia),
+      )
+      for sugestia in filter(is_pending, reversed(database.data['sugestie']))
+    ],
+    callback,
+    interaction.user,
+  ), ephemeral=True)
 
-  @bot.listen()
-  async def on_message(msg):
-    if msg.channel.id == config['sugestie_channel'] and msg.author != bot.user:
-      logging.info('Cleaning #sugestie after a new message')
-      await clean() # Same pattern as in counting.py
+@sugestie.command(description='Oznacza sugestię jako wykonaną')
+@check_pending
+@check_staff('wykonywania sugestii')
+async def done(interaction, changes: str):
+  async def callback(interaction2, choice):
+    sugestia = next(i for i in filter(is_pending, database.data['sugestie']) if i['id'] == int(choice))
 
-  sugestie = discord.app_commands.Group(name='sugestie', description='Komendy do sugestii', guild_ids=[config['guild']])
-  bot.tree.add_command(sugestie)
+    logging.info(f'{interaction2.user.id} has marked sugestia {sugestia["id"]} as done')
+    sugestia['done'] = {
+      'time': interaction2.created_at,
+      'changes': changes,
+    }
+    database.should_save = True
 
-  @sugestie.command(description='Wyświetla sugestię')
-  @check_any
-  async def show(interaction):
-    async def callback(interaction2, choice):
-      sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
-      embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
-      author = await bot.fetch_user(sugestia['author'])
-      embed.set_footer(text=str(author), icon_url=author.display_avatar.url)
-      if sugestia['image'] is None:
-        await interaction2.response.send_message(embed=embed, ephemeral=True)
-      else:
-        filename = 'sugestia' + guess_extension(sugestia['image']['format'])
-        embed.set_image(url=f'attachment://{filename}')
-        await interaction2.response.send_message(embed=embed, file=discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename), ephemeral=True)
+    msg = mention_message(bot, sugestia['channel'], sugestia['id'])
+    await interaction.edit_original_response(content=f'Pomyślnie oznaczono sugestię {msg} jako wykonaną z opisem zmian `{debacktick(changes)}`! 🥳', view=None)
+    await interaction2.response.defer()
 
-    await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
-      [
-        discord.SelectOption(
-          label=limit_len(sugestia['text']),
-          value=sugestia['id'],
-          description=format_datetime(sugestia['time']),
-          emoji=emoji_status_of(sugestia),
-        )
-        for sugestia in reversed(database.data['sugestie'])
-      ],
-      callback,
-      interaction.user,
-    ), ephemeral=True)
+  await interaction.response.send_message(f'Którą sugestię chcesz oznaczyć jako wykonaną z opisem zmian `{debacktick(changes)}`?', view=select_view(
+    [
+      discord.SelectOption(
+        label=limit_len(sugestia['text']),
+        value=sugestia['id'],
+        description=format_datetime(sugestia['time']),
+      )
+      for sugestia in filter(is_pending, reversed(database.data['sugestie']))
+    ],
+    callback,
+    interaction.user,
+  ))
 
-  @sugestie.command(description='Wyświetla sugestię czekająca na wykonanie')
-  @check_pending
-  async def pending(interaction):
-    async def callback(interaction2, choice):
-      sugestia = next(i for i in database.data['sugestie'] if i['id'] == int(choice))
-      embed = discord.Embed(title='Sugestia ' + mention_message(bot, sugestia['channel'], sugestia['id']), description=sugestia['text'])
-      author = await bot.fetch_user(sugestia['author'])
-      embed.set_footer(text=str(author), icon_url=author.display_avatar.url)
-      if sugestia['image'] is None:
-        await interaction2.response.send_message(embed=embed, ephemeral=True)
-      else:
-        filename = 'sugestia' + guess_extension(sugestia['image']['format'])
-        embed.set_image(url=f'attachment://{filename}')
-        await interaction2.response.send_message(embed=embed, file=discord.File(BytesIO(b64decode(sugestia['image']['data'])), filename), ephemeral=True)
+@sugestie.command(description='Unieważnia sugestię')
+@check_annullable
+@check_staff('unieważniania sugestii')
+async def annul(interaction, reason: str):
+  async def callback(interaction2, choice):
+    sugestia = next(i for i in filter(is_annullable, database.data['sugestie']) if i['id'] == int(choice))
 
-    await interaction.response.send_message('Którą sugestię chcesz zobaczyć?', view=select_view(
-      [
-        discord.SelectOption(
-          label=limit_len(sugestia['text']),
-          value=sugestia['id'],
-          description=format_datetime(sugestia['time']),
-          emoji=emoji_status_of(sugestia),
-        )
-        for sugestia in filter(is_pending, reversed(database.data['sugestie']))
-      ],
-      callback,
-      interaction.user,
-    ), ephemeral=True)
+    logging.info(f'{interaction2.user.id} has annulled sugestia {sugestia["id"]}')
+    sugestia['annulled'] = {
+      'time': interaction2.created_at,
+      'reason': reason,
+    }
+    database.should_save = True
 
-  @sugestie.command(description='Oznacza sugestię jako wykonaną')
-  @check_pending
-  @check_staff('wykonywania sugestii')
-  async def done(interaction, changes: str):
-    async def callback(interaction2, choice):
-      sugestia = next(i for i in filter(is_pending, database.data['sugestie']) if i['id'] == int(choice))
+    msg = mention_message(bot, sugestia['channel'], sugestia['id'])
+    await interaction.edit_original_response(content=f'Pomyślnie unieważniono sugestię {msg} z powodu `{debacktick(reason)}`. 🙄', view=None)
+    await interaction2.response.defer()
 
-      logging.info(f'{interaction2.user.id} has marked sugestia {sugestia["id"]} as done')
-      sugestia['done'] = {
-        'time': interaction2.created_at,
-        'changes': changes,
-      }
-      database.should_save = True
+    await update(sugestia)
 
-      msg = mention_message(bot, sugestia['channel'], sugestia['id'])
-      await interaction.edit_original_response(content=f'Pomyślnie oznaczono sugestię {msg} jako wykonaną z opisem zmian `{debacktick(changes)}`! 🥳', view=None)
-      await interaction2.response.defer()
+  await interaction.response.send_message(f'Którą sugestię chcesz unieważnić z powodu `{debacktick(reason)}`?', view=select_view(
+    [
+      discord.SelectOption(
+        label=limit_len(sugestia['text']),
+        value=sugestia['id'],
+        description=format_datetime(sugestia['time']),
+        emoji=emoji_status_of(sugestia),
+      )
+      for sugestia in filter(is_annullable, reversed(database.data['sugestie']))
+    ],
+    callback,
+    interaction.user,
+  ))
 
-    await interaction.response.send_message(f'Którą sugestię chcesz oznaczyć jako wykonaną z opisem zmian `{debacktick(changes)}`?', view=select_view(
-      [
-        discord.SelectOption(
-          label=limit_len(sugestia['text']),
-          value=sugestia['id'],
-          description=format_datetime(sugestia['time']),
-        )
-        for sugestia in filter(is_pending, reversed(database.data['sugestie']))
-      ],
-      callback,
-      interaction.user,
-    ))
+@sugestie.command(description='Usuwa pomyłkowo wysłaną sugestię')
+@check_eraseable
+async def erase(interaction):
+  async def callback(interaction2, choice):
+    sugestia = next(i for i in filter(is_eraseable_in(interaction2), database.data['sugestie']) if i['id'] == int(choice))
 
-  @sugestie.command(description='Unieważnia sugestię')
-  @check_annullable
-  @check_staff('unieważniania sugestii')
-  async def annul(interaction, reason: str):
-    async def callback(interaction2, choice):
-      sugestia = next(i for i in filter(is_annullable, database.data['sugestie']) if i['id'] == int(choice))
+    logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
+    database.data['sugestie'].remove(sugestia)
+    database.should_save = True
 
-      logging.info(f'{interaction2.user.id} has annulled sugestia {sugestia["id"]}')
-      sugestia['annulled'] = {
-        'time': interaction2.created_at,
-        'reason': reason,
-      }
-      database.should_save = True
+    try:
+      await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).delete()
+    except discord.errors.NotFound:
+      pass
 
-      msg = mention_message(bot, sugestia['channel'], sugestia['id'])
-      await interaction.edit_original_response(content=f'Pomyślnie unieważniono sugestię {msg} z powodu `{debacktick(reason)}`. 🙄', view=None)
-      await interaction2.response.defer()
+    await interaction.edit_original_response(content=f'Pomyślnie usunięto sugestię o treści `{limit_len(debacktick(sugestia["text"]))}`. 🙄', view=None)
+    await interaction2.response.defer()
 
-      await update(sugestia)
+  await interaction.response.send_message(f'Którą sugestię chcesz usunąć?', view=select_view(
+    [
+      discord.SelectOption(
+        label=limit_len(sugestia['text']),
+        value=sugestia['id'],
+        description=format_datetime(sugestia['time']),
+        emoji=emoji_status_of(sugestia),
+      )
+      for sugestia in filter(is_eraseable_in(interaction), reversed(database.data['sugestie']))
+    ],
+    callback,
+    interaction.user,
+  ))
 
-    await interaction.response.send_message(f'Którą sugestię chcesz unieważnić z powodu `{debacktick(reason)}`?', view=select_view(
-      [
-        discord.SelectOption(
-          label=limit_len(sugestia['text']),
-          value=sugestia['id'],
-          description=format_datetime(sugestia['time']),
-          emoji=emoji_status_of(sugestia),
-        )
-        for sugestia in filter(is_annullable, reversed(database.data['sugestie']))
-      ],
-      callback,
-      interaction.user,
-    ))
-
-  @sugestie.command(description='Usuwa pomyłkowo wysłaną sugestię')
-  @check_eraseable
-  async def erase(interaction):
-    async def callback(interaction2, choice):
-      sugestia = next(i for i in filter(is_eraseable_in(interaction2), database.data['sugestie']) if i['id'] == int(choice))
-
-      logging.info(f'{interaction2.user.id} has erased sugestia {sugestia["id"]}')
-      database.data['sugestie'].remove(sugestia)
-      database.should_save = True
-
-      try:
-        await bot.get_channel(sugestia['channel']).get_partial_message(sugestia['id']).delete()
-      except discord.errors.NotFound:
-        pass
-
-      await interaction.edit_original_response(content=f'Pomyślnie usunięto sugestię o treści `{limit_len(debacktick(sugestia["text"]))}`. 🙄', view=None)
-      await interaction2.response.defer()
-
-    await interaction.response.send_message(f'Którą sugestię chcesz usunąć?', view=select_view(
-      [
-        discord.SelectOption(
-          label=limit_len(sugestia['text']),
-          value=sugestia['id'],
-          description=format_datetime(sugestia['time']),
-          emoji=emoji_status_of(sugestia),
-        )
-        for sugestia in filter(is_eraseable_in(interaction), reversed(database.data['sugestie']))
-      ],
-      callback,
-      interaction.user,
-    ))
-
-async def fix_all(from_id):
+@console.operation(desc='fixes all sugestie starting from the given one')
+async def fix_all(from_id: int):
   logging.info(f'Updating all sugestie starting from {from_id}')
   for sugestia in database.data.get('sugestie', []):
     if sugestia['id'] >= from_id:
       await update(sugestia)
       await update_embed(sugestia)
 
-async def delete_image(id):
+@console.operation(desc='deletes the image from a sugestia')
+async def delete_image(id: int):
   logging.info(f'Deleting image from sugestia {id}')
   sugestia = next(i for i in database.data['sugestie'] if i['id'] == id)
   sugestia['image'] = None
   database.should_save = True
   await update_embed(sugestia)
-
-console.begin('sugestie')
-console.register('fix_all', '<id>', 'fixes all sugestie starting from the given one', lambda x: asyncio.run_coroutine_threadsafe(fix_all(int(x)), bot.loop).result())
-console.register('delete_image', '<id>', 'deletes the image from a sugestia', lambda x: asyncio.run_coroutine_threadsafe(delete_image(int(x)), bot.loop).result())
-console.end()

@@ -14,16 +14,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord
 from dataclasses import dataclass
+from discord import app_commands
 
-from common import config, hybrid_check
+from common import config, event_listener, hybrid_check
 
 def is_staff(member):
   return any(member.get_role(i) is not None for i in config['staff_roles'])
 
 @dataclass
-class NotStaffError(discord.app_commands.CheckFailure):
+class NotStaffError(app_commands.CheckFailure):
   action: str
 
 def check_staff(action=None): # "… uprawnień do {action}, …"
@@ -35,10 +35,9 @@ def check_staff(action=None): # "… uprawnień do {action}, …"
       raise NotStaffError(action)
   return pred
 
-async def setup(bot):
-  @bot.on_check_failure
-  async def on_check_failure(interaction, error):
-    if isinstance(error, NotStaffError):
-      await interaction.response.send_message(f'Nie masz uprawnień do {error.action}, tylko administracja może to robić. 😡', ephemeral=True)
-    else:
-      raise
+@event_listener
+async def on_check_failure(interaction, error):
+  if isinstance(error, NotStaffError):
+    await interaction.response.send_message(f'Nie masz uprawnień do {error.action}, tylko administracja może to robić. 😡', ephemeral=True)
+  else:
+    raise
