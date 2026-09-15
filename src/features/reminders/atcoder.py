@@ -23,6 +23,37 @@ from discord import app_commands
 import console, database
 from common import config, log_exceptions, loop, mention_datetime, parse_duration, sleep_until
 
+lock = asyncio.Lock()
+
+def get_handle(user):
+  return database.data.get('atcoder_handles', {}).get(user)
+
+async def set_handle(user, handle):
+  if handle is None:
+    try:
+      del database.data['atcoder_handles'][user]
+      database.should_save = True
+      log.info(f'{user} has unset their AtCoder handle')
+      return True
+    except KeyError:
+      return False
+
+  async with lock:
+    database.data.setdefault('atcoder_handles', {})[user] = handle
+    prev_owners = [k for k, v in database.data['atcoder_handles'].items() if k != user and v == handle]
+    if prev_owners:
+      log.info(f'{user} has successfully stolen AtCoder handle {handle!r} from {prev_owners}')
+    else:
+      log.info(f'{user} has successfully set their AtCoder handle to {handle!r}')
+    for prev_owner in prev_owners:
+      del database.data['atcoder_handles'][prev_owner]
+      try:
+        await (await bot.fetch_user(prev_owner)).send(f'<@{user}> ukradł mi twój nick na AtCoder! 😱')
+      except:
+        log.exception('Got exception while notifying old handle owner')
+  database.should_save = True
+  return True
+
 @dataclass
 class Contest:
   id: str
@@ -173,7 +204,6 @@ async def poll():
 
 atcoder = app_commands.Group(name='atcoder', description='Komendy do nicków na AtCoder')
 
-# TODO: handle stealing others' handles properly
 @atcoder.command(name='set', description='Zapamiętuje twój nick na AtCoder')
 async def set_(interaction, handle: str):
   log.info(f'{interaction.user.id} requested to set their AtCoder handle to {handle!r}')
@@ -207,9 +237,7 @@ async def set_(interaction, handle: str):
     read = None
 
   if read is not None and ''.join(read.split()) == a + b:
-    log.info(f'{interaction.user.id} has successfully set their AtCoder handle to {handle!r}')
-    database.data.setdefault('atcoder_handles', {})[interaction.user.id] = handle
-    database.should_save = True
+    assert await set_handle(interaction.user.id, handle)
     await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na AtCoder na `{handle}`! 🥳\n')
   else:
     log.info(f'{interaction.user.id} failed to verify their AtCoder handle ({read!r} != {a!r} & {b!r})')
@@ -222,7 +250,7 @@ async def set_(interaction, handle: str):
     await interaction.edit_original_response(content=f'Weryfikacja nie powiodła się. Oczekiwano `{a} {b}`, wczytano {read}. 😕')
 
 async def get(interaction, user):
-  handle = database.data.get('atcoder_handles', {}).get(user.id)
+  handle = get_handle(user.id)
   if handle is None:
     await interaction.response.send_message(f'{user.mention} nie podzielił się jeszcze swoim nickiem na AtCoder. 🕵️', ephemeral=True)
   else:
@@ -238,14 +266,10 @@ async def menu_get(interaction, user: discord.User):
 
 @atcoder.command(description='Zapomina twój nick na AtCoder')
 async def unset(interaction):
-  try:
-    del database.data['atcoder_handles'][interaction.user.id]
-    database.should_save = True
-  except KeyError:
-    await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na AtCoder… 🤨', ephemeral=True)
-  else:
-    log.info(f'{interaction.user.id} has unset their AtCoder handle')
+  if await set_handle(interaction.user.id, None):
     await interaction.response.send_message('Pomyślnie zapomniano twój nick na AtCoder. 🫡', ephemeral=True)
+  else:
+    await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na AtCoder… 🤨', ephemeral=True)
 
 @console.operation(desc='send the standings of Polish contestants in an AtCoder contest')
 async def send_standings(contest_id: int):

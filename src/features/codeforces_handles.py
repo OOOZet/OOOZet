@@ -14,25 +14,41 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp, discord, random, string
+import aiohttp, asyncio, discord, random, string
 from datetime import datetime, timedelta
 from discord import app_commands
 
 import database
 from common import mention_datetime, sleep_until
 
+lock = asyncio.Lock()
+
 def get_handle(user):
   return database.data.get('codeforces_handles', {}).get(user)
 
-# TODO: handle stealing others' handles properly
-def set_handle(user, value):
-  if value is None:
+async def set_handle(user, handle):
+  if handle is None:
     try:
       del database.data['codeforces_handles'][user]
+      database.should_save = True
+      log.info(f'{user} has unset their Codeforces handle')
+      return True
     except KeyError:
       return False
-  else:
-    database.data.setdefault('codeforces_handles', {})[user] = value
+
+  async with lock:
+    database.data.setdefault('codeforces_handles', {})[user] = handle
+    prev_owners = [k for k, v in database.data['codeforces_handles'].items() if k != user and v == handle]
+    if prev_owners:
+      log.info(f'{user} has successfully stolen Codeforces handle {handle!r} from {prev_owners}')
+    else:
+      log.info(f'{user} has successfully set their Codeforces handle to {handle!r}')
+    for prev_owner in prev_owners:
+      del database.data['codeforces_handles'][prev_owner]
+      try:
+        await (await bot.fetch_user(prev_owner)).send(f'<@{user}> ukradł mi twój nick na Codeforces! 😱')
+      except:
+        log.exception('Got exception while notifying old handle owner')
   database.should_save = True
   return True
 
@@ -82,8 +98,7 @@ async def set_(interaction, handle: str):
     success = None
 
   if success is not None:
-    log.info(f'{interaction.user.id} has successfully set their Codeforces handle to {handle!r}')
-    assert set_handle(interaction.user.id, handle)
+    assert await set_handle(interaction.user.id, handle)
     await interaction.edit_original_response(content=f'Pomyślnie zweryfikowano i ustawiono twój nick na Codeforces na `{handle}`! 🥳\n{success}')
   else:
     log.info(f'{interaction.user.id} failed to verify their Codeforces handle ({first!r} & {last!r} != {a!r} & {b!r})')
@@ -112,8 +127,7 @@ async def menu_get(interaction, user: discord.User):
 
 @codeforces.command(description='Zapomina twój nick na Codeforces')
 async def unset(interaction):
-  if set_handle(interaction.user.id, None):
-    log.info(f'{interaction.user.id} has unset their Codeforces handle')
+  if await set_handle(interaction.user.id, None):
     await interaction.response.send_message('Pomyślnie zapomniano twój nick na Codeforces. 🫡', ephemeral=True)
   else:
     await interaction.response.send_message('Nie podałeś mi jeszcze swojego nicku na Codeforces… 🤨', ephemeral=True)

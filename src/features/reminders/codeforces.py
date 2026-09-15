@@ -118,7 +118,7 @@ async def send_national_standings(contest):
       if new_handle == old_handle or get_handle(user) != old_handle:
         continue
       log.info(f"Updating {user}'s Codeforces handle from {old_handle!r} to {new_handle!r}")
-      set_handle(user, new_handle)
+      assert await set_handle(user, new_handle)
 
   lines = []
 

@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # TODO: anti-nuke
+# TODO: message server maintainer when an error happens
 
 import asyncio, discord, random, sys, threading
 from discord import app_commands
