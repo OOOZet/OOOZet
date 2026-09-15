@@ -27,8 +27,8 @@ log = getLogger(__name__)
 async_loop = None
 server = None
 thread = None
-should_stop_listen = False
-should_stop_conn = False
+listen_should_stop = False
+serve_should_stop = False
 
 def start():
   global server
@@ -49,9 +49,9 @@ def start():
 def stop():
   log.info('Stopping console')
 
-  global should_stop_listen, should_stop_conn
-  should_stop_listen = True
-  should_stop_conn = True
+  global listen_should_stop, serve_should_stop
+  listen_should_stop = True
+  serve_should_stop = True
 
   if client is not None:
     # This will cancel a pending client.recv(). We can still send data to the
@@ -64,100 +64,93 @@ def stop():
 
 client = None
 
-# TODO: do we really want to play cat and mouse with all these specific exceptions?
 def listen():
-  global should_stop_listen
-  should_stop_listen = False
-  while not should_stop_listen:
+  global listen_should_stop
+  listen_should_stop = False
+  while not listen_should_stop:
     try:
       global client
       (client, addr) = server.accept()
     except OSError:
       continue # We probably got cancelled by stop().
-
     log.info(f'Console accepted connection from {addr[0]}:{addr[1]}')
+
     try:
-      client.send(f'{config["console_hello"]} says hello!\n'.encode())
-      client.send('Type "help" to get a list of available operations.\n'.encode())
-    except BrokenPipeError:
-      pass
-
-    is_client_gone = False
-
-    global should_stop_conn
-    should_stop_conn = False
-    while not should_stop_conn:
+      serve()
+    except:
+      log.exception('Got exception while serving console connection')
       try:
-        client.send(b'> ')
-      except BrokenPipeError:
+        client.send(b'\nSomething went wrong, bye.\n')
+      except:
         pass
 
-      timeout = parse_duration(config['console_timeout'])
-      client.settimeout(timeout)
-      try:
-        chunk = client.recv(4096)
-      except TimeoutError:
-        client.send(f'\nTimed out after {timeout} seconds.\n'.encode())
-        break
-
-      if not chunk:
-        if should_stop_listen: # This is how we know we got cancelled by stop().
-          client.send(b'\nI have to go, bye.\n')
-        else:
-          is_client_gone = True
-          try:
-            client.send(b'\nThe connection got closed without a goodbye. How rude!\n')
-          except BrokenPipeError:
-            pass
-        break
-      elif chunk == b'\x04':
-        client.send(b'\nGot end of transmission without a goodbye. How rude!\n')
-        break
-
-      line = bytearray(chunk)
-      client.setblocking(False)
-      try:
-        while chunk := client.recv(4096):
-          line += chunk
-      except BlockingIOError: # There is nothing left to receive.
-        pass
-
-      try:
-        line = line.decode()
-      except Exception as e:
-        log.exception('Got exception while decoding console command')
-        try:
-          client.send(''.join(traceback.format_exception(None, e, e.__traceback__)).encode())
-        except BrokenPipeError: # The client sent junk and ran away.
-          pass
-        continue
-
-      log.info(f'Console received command {line!r}')
-
-      try:
-        reply = run(line)
-        if reply is not None and not isinstance(reply, str):
-          reply = pprint.pformat(reply, sort_dicts=False)
-      except Exception as e:
-        log.exception('Got exception while running console command')
-        reply = ''.join(traceback.format_exception(None, e, e.__traceback__))
-
-      try:
-        if reply is not None:
-          client.send(reply.encode())
-          if not reply.endswith('\n'):
-            client.send(b'\n')
-      except BrokenPipeError: # The client sent a command and ran away.
-        pass
-
-    try: # We don't want any exceptions here because that would kill our thread and the whole console.
-      if not is_client_gone: # Calling shutdown() on a socket closed by the client would raise an exception.
-        client.shutdown(socket.SHUT_RDWR)
+    try:
+      client.shutdown(socket.SHUT_RDWR)
+    except:
+      log.exception('Got exception while shutting down console connection')
+    try:
       client.close()
     except:
       log.exception('Got exception while closing console connection')
     client = None
     log.info('Console connection closed')
+
+def serve():
+  client.send(f'{config["console_hello"]} says hello!\n'.encode())
+  client.send('Type "help" to get a list of available operations.\n'.encode())
+
+  global serve_should_stop
+  serve_should_stop = False
+  while not serve_should_stop:
+    client.send(b'> ')
+
+    timeout = parse_duration(config['console_timeout'])
+    client.settimeout(timeout)
+    try:
+      chunk = client.recv(4096)
+    except TimeoutError:
+      client.send(f'\nTimed out after {timeout} seconds.\n'.encode())
+      break
+
+    if not chunk:
+      if listen_should_stop: # This is how we know we got cancelled by stop().
+        client.send(b'\nI have to go, bye.\n')
+      else:
+        client.send(b'\nThe connection got closed without a goodbye. How rude!\n')
+      break
+    elif chunk == b'\x04':
+      client.send(b'\nGot end of transmission without a goodbye. How rude!\n')
+      break
+
+    line = bytearray(chunk)
+    client.setblocking(False)
+    try:
+      while chunk := client.recv(4096):
+        line += chunk
+    except BlockingIOError: # There is nothing left to receive.
+      pass
+
+    try:
+      line = line.decode()
+    except Exception as e:
+      log.exception('Got exception while decoding console command')
+      client.send(''.join(traceback.format_exception(None, e, e.__traceback__)).encode())
+      continue
+
+    log.info(f'Console received command {line!r}')
+
+    try:
+      reply = run(line)
+      if reply is not None and not isinstance(reply, str):
+        reply = pprint.pformat(reply, sort_dicts=False)
+    except Exception as e:
+      log.exception('Got exception while running console command')
+      reply = ''.join(traceback.format_exception(None, e, e.__traceback__))
+
+    if reply is not None:
+      client.send(reply.encode())
+      if not reply.endswith('\n'):
+        client.send(b'\n')
 
 def operation(*args, **kwargs):
   def decorator(func):
@@ -267,15 +260,15 @@ def op_help():
 
 @operation(name='bye', desc='closes this connection')
 def op_bye():
-  global should_stop_conn
-  should_stop_conn = True
+  global serve_should_stop
+  serve_should_stop = True
   return 'Goodbye!'
 
 @operation(name='restart', desc='restarts the console')
 def op_restart():
   stop()
   # We have to delay the start() because otherwise it would override client and
-  # should_stop_listen and we wouldn't be able to properly clean up and return
+  # listen_should_stop and we wouldn't be able to properly clean up and return
   # from listen().
   def target():
     while client is not None:
