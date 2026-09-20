@@ -102,6 +102,9 @@ class Client(discord.Client):
           if value.parent is None:
             self.tree.add_command(value)
 
+        elif isinstance(value, app_commands.ContextMenu):
+          self.tree.add_command(value)
+
         elif isinstance(value, console.Operation):
           if value.scope is None:
             value.scope = feature.feature_id.replace('_', '-')

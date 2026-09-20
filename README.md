@@ -35,6 +35,7 @@ Wstrzykiwane zmienne globalne:
 Automatycznie rejestrowane wartości w zmiennych globalnych:
 - `app_commands.Group`
 - `app_commands.Command`, jeśli nie są już w jakiejś grupie.
+- `app_commands.ContextMenu`
 - `common.Loop` - Tu "rejestracja" oznacza wystartowanie pętli.
 - `console.Operation`, automatycznie ustawiając w nich `scope`.
 - Funkcje oznaczone dekoratorem `common.event_listener`

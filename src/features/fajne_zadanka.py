@@ -96,7 +96,7 @@ async def find_problem(url):
         next(html.find(class_='problem-title').h1.strings).strip(),
       )
 
-  elif url.hostname == 'qoj.ac':
+  elif url.hostname == 'qoj.ac': # BUG: this is still broken
     if match := re.match('(?:/contest/[0-9]+)?/problem/([0-9]+)', path):
       url = f'https://qoj.ac/problem/{match[1]}'
       return url, (await fetch_html(url)).find(class_='page-header').text.partition('.')[2].strip()
