@@ -191,6 +191,8 @@ async def update_duel(duel):
   duel['last_update'] = datetime.now().astimezone()
 
   try:
+    duel['end'] = duel['start'] + timedelta(seconds=duel['settings']['duration'])
+
     first_solves = {}
     for player, player_submissions in enumerate(await get_duel_players_submissions(duel)):
       for submission in player_submissions['result']:
@@ -214,7 +216,7 @@ async def update_duel(duel):
           pass
 
     if all('solved' in task for task in duel['tasks']):
-      duel['end'] = max(duel['start'], task['solved'])
+      duel['end'] = max(duel['start'], *(task['solved'] for task in duel['tasks']))
 
     database.should_save = True
 
@@ -335,7 +337,6 @@ class Invite:
         raise CannotMessageError(self.inviter)
 
       duel['start'] = datetime.now().astimezone()
-      duel['end'] = duel['start'] + timedelta(seconds=duel['settings']['duration'])
       duel['messages'] = [[msg_to_inviter.channel.id, msg_to_inviter.id], [self.msg.channel.id, self.msg.id]]
 
       await update_duel(duel)
@@ -497,3 +498,7 @@ def status():
   if not result:
     result = 'no active duels nor invites'
   return result
+
+@console.operation(name='update-duel', desc='updates duel by index')
+async def op_update_duel(idx: int):
+  await update_duel(database.data['lockout_duels'][idx])
