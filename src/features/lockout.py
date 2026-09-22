@@ -191,7 +191,8 @@ async def update_duel(duel):
   duel['last_update'] = datetime.now().astimezone()
 
   try:
-    duel['end'] = duel['start'] + timedelta(seconds=duel['settings']['duration'])
+    if 'aborted' not in duel:
+      duel['end'] = duel['start'] + timedelta(seconds=duel['settings']['duration'])
 
     first_solves = {}
     for player, player_submissions in enumerate(await get_duel_players_submissions(duel)):
@@ -342,17 +343,20 @@ class Invite:
       await update_duel(duel)
       asyncio.create_task(time_duel_update(duel))
 
-      assert self.duel is None
-      self.duel = duel
-      database.data.setdefault('lockout_duels', []).append(duel)
-      database.should_save = True
-
     except:
       try:
         await msg_to_inviter.delete()
       except:
         pass
       raise
+
+    # At this point the original invite message has already been overwritten by
+    # update_duel, so there is no point in doing error recovery for the next steps.
+    invites.remove(self)
+    assert self.duel is None
+    self.duel = duel
+    database.data.setdefault('lockout_duels', []).append(duel)
+    database.should_save = True
 
     await self.interaction.edit_original_response(content=f'{self.invitee.mention} przyjął twoje wyzwanie! **Kliknij [tutaj]({msg_to_inviter.jump_url})** aby przejść do wiadomości z widokiem pojedynku. 👀')
     await interaction.delete_original_response()
@@ -365,6 +369,9 @@ class Invite:
     await self.update()
 
   async def update(self):
+    if self.duel is not None:
+      return
+
     log.info(f'Updating lockout invite from {self.inviter.id} to {self.invitee.id}')
     if datetime.now().astimezone() >= self.timeout_time:
       invites.remove(self)
