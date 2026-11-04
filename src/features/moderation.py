@@ -20,6 +20,7 @@ from discord import app_commands
 from itertools import chain
 
 from common import config, debacktick, mention_datetime, parse_duration
+from features.staff_log import log_deleted_message
 from features.utils import check_staff
 
 async def kick(interaction, member):
@@ -184,13 +185,19 @@ async def purge(interaction, from_: str, to: str | None, user: discord.User | No
       deletedc = 1
     except discord.NotFound:
       deletedc = 0
-    deletedc += len(await interaction.channel.purge(
+    purged_mesages = await interaction.channel.purge(
       after=from_,
       before=to,
       check=lambda msg: user is None or msg.author == user,
       reason=f'Na żądanie {interaction.user}',
       limit=None,
-    ))
+    )
+    for msg in purged_mesages:
+      try:
+        await log_deleted_message(msg)
+      except:
+        log.exception('Got exception while logging purged message')
+    deletedc += len(purged_mesages)
     if to is not None and from_ != to:
       try:
         await to.delete()
