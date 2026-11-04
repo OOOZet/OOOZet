@@ -1,5 +1,5 @@
 # OOOZet - Bot społeczności OOOZ
-# Copyright (C) 2023-2026 Karol "digitcrusher" Łacina
+# Copyright (C) 2026 semkishow
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -14,15 +14,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import discord, difflib
-from io import BytesIO
+import difflib, discord
+from io import StringIO
 
-from common import config, event_listener
+from common import config, debacktick, event_listener
+
+# TODO: log embeds
 
 EMBED_FIELD_LIMIT = 1024
 
+# This function should only be used in combination with _render_content
 def _sanitize_content(message):
-  return message.replace('`', '\u2060`').replace('\x1b', '')
+  # \u2060 word joiner is used to break up a sequence of 3 backticks
+  # A third \u2060 at the end is necessary for when there is a sequence of 5 backticks in a row
+  # If the third word joiner is absent, this sequence is escaped like this:
+  # `\u2060`\u2060```
+  # which is incorrect
+  return message.replace('```', '`\u2060`\u2060`\u2060').replace('\x1b', '')
 
 def _render_content(content):
   if content == '': return ''
@@ -31,31 +39,28 @@ def _render_content(content):
 def _render_attachments(attachments):
   return '\n'.join([f'- {attachment.url}' for attachment in attachments])
 
-def _render_embeds(embeds):
-  return '\n'.join([f'{embed.title}\n{embed.description}' for embed in embeds])
-
 async def log_deleted_message(msg):
   files = []
   embed = discord.Embed(title='Usunięto wiadomość', colour=discord.Colour.red())
   embed.add_field(name='Użytkownik: ', value=msg.author.mention)
   embed.add_field(name='Kanał: ', value=msg.channel.mention)
 
+  # Longer messages are sent as a .txt file
+  # .md format is not used because the default behaviour also ignores formatting and
+  # markdown file renderer has a slightly different behaviour from the messages renderer
   content = _render_content(_sanitize_content(msg.content))
-  if len(content) > EMBED_FIELD_LIMIT:
-    files.append(discord.File(BytesIO(str.encode(msg.content)), 'message.txt'))
-  else:
-    embed.add_field(name='', value=content, inline=False)
+  if content != '':
+    if len(content) > EMBED_FIELD_LIMIT:
+      files.append(discord.File(StringIO(msg.content), 'Treść.txt'))
+    else:
+      embed.add_field(name='', value=content, inline=False)
 
   if msg.poll:
-    answers = '\n'.join([f'Odpowiedź: `{answer.media.text}`' for answer in msg.poll.answers])
-    embed.add_field(name='Ankieta: ', value=f'Pytanie: `{msg.poll.question}`\n{answers}', inline=False)
-
-  if len(msg.embeds) > 0:
-    embed.add_field(name='Embedy: ', value=_render_embeds(msg.embeds), inline=False)
+    answers = '\n'.join([f'Odpowiedź: `{debacktick(answer.media.text)}`' for answer in msg.poll.answers])
+    embed.add_field(name='Ankieta: ', value=f'Pytanie: `{debacktick(msg.poll.question)}`\n{answers}', inline=False)
 
   if msg.reference:
-    referenced_msg = await bot.get_channel(msg.reference.channel_id).fetch_message(msg.reference.message_id)
-    embed.add_field(name='Przywołana wiadomość: ', value=referenced_msg.jump_url, inline=False)
+    embed.add_field(name='Przywołana wiadomość: ', value=msg.reference.jump_url, inline=False)
 
   if msg.attachments:
     if len(msg.attachments) == 1:
@@ -76,34 +81,20 @@ ANSI_RED = '\x1b[31m'
 ANSI_GREEN = '\x1b[32m'
 ANSI_CLEAR = '\x1b[0m'
 
-class AnsiChar:
-  def __init__(self, text: str = '', *, color: str = ''):
-    self.text = text
-    self.color = color
-
-class AnsiText:
-  def __init__(self, plain_text: str = ''):
-    self.text = [AnsiChar(c) for c in plain_text]
-
-  def __str__(self):
-    res = ''
-    last_char = AnsiChar()
-    for c in self.text:
-      if c.color != last_char.color:
-        res += ANSI_CLEAR + c.color
-      res += c.text
-      last_char = c
-    res += ANSI_CLEAR
-    return res
-
 def _highlight_chars_added(before, after, *, color: str = ANSI_GREEN):
-  res = AnsiText(before)
-  for i, s in enumerate(difflib.ndiff(before, after)):
-    if s[0] == '-':
-      res.text[i] = AnsiChar()
-    elif s[0] == '+':
-      res.text.insert(i, AnsiChar(s[-1], color=color))
-  return _render_content(str(res))
+  res = ''
+  last_op = ' '
+  for _, s in enumerate(difflib.ndiff(before, after)):
+    op = s[0]
+    if op != last_op:
+      if op == '+':
+        res += color
+      elif op == ' ':
+        res += ANSI_CLEAR
+      last_op = op
+    if op == '+' or op == ' ':
+      res += s[-1]
+  return _render_content(res)
 
 @event_listener
 async def on_message_edit(before, after):
@@ -118,34 +109,24 @@ async def on_message_edit(before, after):
   embed.add_field(name='Użytkownik: ', value=after.author.mention)
   embed.add_field(name='Wiadomość: ', value=after.jump_url)
 
-  if before_content != after_content:
+  if before_content != after_content and (before_content != '' or after_content != ''):
     before_rendered = _highlight_chars_added(after_content, before_content, color=ANSI_RED)
     if len(before_rendered) > EMBED_FIELD_LIMIT:
-      files.append(discord.File(BytesIO(str.encode(before.content)), 'before.txt'))
+      files.append(discord.File(StringIO(before.content), 'Przed.txt'))
     else:
       embed.add_field(name='Przed: ', value=before_rendered, inline=False)
 
     after_rendered = _highlight_chars_added(before_content, after_content, color=ANSI_GREEN)
     if len(after_rendered) > EMBED_FIELD_LIMIT:
-      files.append(discord.File(BytesIO(str.encode(after.content)), 'after.txt'))
+      files.append(discord.File(StringIO(after.content), 'Po.txt'))
     else:
       embed.add_field(name='Po: ', value=after_rendered, inline=False)
 
-  if before.embeds != after.embeds:
-    embed.add_field(name='Embedy przed: ', value=_render_embeds(before.embeds), inline=False)
-    embed.add_field(name='Embedy po: ', value=_render_embeds(after.embeds), inline=False)
-
   if before.reference != after.reference:
-    reference_before = await bot.get_channel(before.reference.channel_id).fetch_message(before.reference.message_id)
-    embed.add_field(name='Przywołana wiadomość przed: ', value=reference_before.jump_url, inline=False)
-    reference_after = await bot.get_channel(after.reference.channel_id).fetch_message(after.reference.message_id)
-    embed.add_field(name='Przywołana wiadomość po: ', value=reference_after.jump_url, inline=False)
+    embed.add_field(name='Przywołana wiadomość przed: ', value=before.reference.jump_url, inline=False)
+    embed.add_field(name='Przywołana wiadomość po: ', value=after.reference.jump_url, inline=False)
 
   if before.attachments != after.attachments:
-    if len(after.attachments) > 0:
-      embed.set_image(url=after.attachments[0].url)
-    elif len(before.attachments) > 0:
-      embed.set_image(url=before.attachments[0].url)
     embed.add_field(name='Załączniki przed: ', value=_render_attachments(before.attachments), inline=False)
     embed.add_field(name='Załączniki po: ', value=_render_attachments(after.attachments), inline=False)
 
@@ -155,14 +136,8 @@ async def on_message_edit(before, after):
 async def on_member_update(before, after):
   if before.nick == after.nick: return
 
-  embed = discord.Embed(title='Zmieniono nick użytkownika', colour=discord.Colour.light_gray())
+  embed = discord.Embed(title='Zmieniono nick użytkownika', colour=discord.Colour.yellow())
   embed.add_field(name='Użytkownik: ', value=after.mention)
-  if before.nick:
-    embed.add_field(name='Nick przed: ', value=before.nick, inline=False)
-  else:
-    embed.add_field(name='Nick przed: ', value=before.global_name, inline=False)
-  if after.nick:
-    embed.add_field(name='Nick po: ', value=after.nick, inline=False)
-  else:
-    embed.add_field(name='Nick po: ', value=after.global_name, inline=False)
+  embed.add_field(name='Nick przed: ', value=before.display_name, inline=False)
+  embed.add_field(name='Nick po: ', value=after.display_name, inline=False)
   await bot.get_channel(config['staff_log_channel']).send(embed=embed)
