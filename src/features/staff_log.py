@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import difflib, discord
+import difflib, discord, re
 from io import StringIO
 
 from common import config, debacktick, event_listener
@@ -79,21 +79,24 @@ ANSI_RED = '\x1b[31m'
 ANSI_GREEN = '\x1b[32m'
 ANSI_CLEAR = '\x1b[0m'
 
-def _highlight_chars_added(before, after, *, color: str = ANSI_GREEN):
+def _highlight_changed_chars(before, after, *, should_return_added, color: str = ANSI_GREEN):
+  desired_op = '+' if should_return_added else '-'
   res = ''
   last_op = ' '
-  for s in difflib.ndiff(before, after):
+  for s in difflib.ndiff(split_on_word_boundaries(before), split_on_word_boundaries(after)):
     op = s[0]
     if op != last_op:
-      if op == '+':
+      if op == desired_op:
         res += color
-        last_op = op
       elif op == ' ':
         res += ANSI_CLEAR
-        last_op = op
-    if op == '+' or op == ' ':
-      res += s[-1]
+      last_op = op
+    if op == desired_op or op == ' ':
+      res += s[2:]
   return _render_content(res)
+
+def split_on_word_boundaries(string):
+  return re.split(r'(\W+)', string)
 
 @event_listener
 async def on_message_edit(before, after):
@@ -109,13 +112,13 @@ async def on_message_edit(before, after):
   embed.add_field(name='Wiadomość:', value=after.jump_url)
 
   if before_content != after_content:
-    before_rendered = _highlight_chars_added(after_content, before_content, color=ANSI_RED)
+    before_rendered = _highlight_changed_chars(before_content, after_content, should_return_added=False, color=ANSI_RED)
     if len(before_rendered) > EMBED_FIELD_LIMIT:
       files.append(discord.File(StringIO(before.content), 'Przed.txt'))
     else:
       embed.add_field(name='Przed:', value=before_rendered, inline=False)
 
-    after_rendered = _highlight_chars_added(before_content, after_content, color=ANSI_GREEN)
+    after_rendered = _highlight_changed_chars(before_content, after_content, should_return_added=True, color=ANSI_GREEN)
     if len(after_rendered) > EMBED_FIELD_LIMIT:
       files.append(discord.File(StringIO(after.content), 'Po.txt'))
     else:
