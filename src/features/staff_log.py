@@ -141,6 +141,6 @@ async def on_member_update(before, after):
 
   embed = discord.Embed(title='Zmieniono nick użytkownika', colour=discord.Colour.yellow())
   embed.add_field(name='Użytkownik:', value=after.mention)
-  embed.add_field(name='Nick przed:', value=before.display_name, inline=False)
-  embed.add_field(name='Nick po:', value=after.display_name, inline=False)
+  embed.add_field(name='Przed:', value=f'`{debacktick(before.display_name)}`', inline=False)
+  embed.add_field(name='Po:', value=f'`{debacktick(after.display_name)}`', inline=False)
   await bot.get_channel(config['staff_log_channel']).send(embed=embed)
