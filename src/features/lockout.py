@@ -321,7 +321,7 @@ class Invite:
     try:
       chosen_ids = random.sample(population, count)
     except ValueError:
-      await interaction.response.send_message('Nie znalazłem wystarczająco zadań, które spełniałyby podane kryteria i których żadne z was nie rozwiązało… 🧐', ephemeral=True)
+      await interaction.followup.send('Nie znalazłem wystarczająco zadań, które spełniałyby podane kryteria i których żadne z was nie rozwiązało… 🧐', ephemeral=True)
       return
     duel['tasks'] = [
       {

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-#
 # OOOZet - Bot społeczności OOOZ
 # Copyright (C) 2023-2026 Karol "digitcrusher" Łacina
 #
@@ -17,6 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # TODO: set up some code formatter
+# BUG: te errory przy brakujacych kluczach musze naprawic
+# TODO: sticky messages
 
 import discord, sys
 from logging import getLogger

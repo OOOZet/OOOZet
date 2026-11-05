@@ -20,6 +20,7 @@ from io import StringIO
 from common import config, debacktick, event_listener
 
 # IDEA: log embeds
+# TODO: log member join and leave with IDs
 
 EMBED_FIELD_LIMIT = 1024
 
@@ -29,7 +30,12 @@ def _sanitize_content(message):
   # have to fit into the EMBED_FIELD_LIMIT. A second U+2060 at the end is necessary for when there
   # is a sequence of 5 backticks in a row. If the second word joiner is absent, this sequence is
   # escaped like this: '``\u2060```', which is incorrect.
-  return message.replace('```', '``\u2060`\u2060').replace('\x1b', '')
+  result = message.replace('```', '``\u2060`\u2060').replace('\x1b', '')
+  if result.endswith('`'):
+    # Add a word joiner at the end, so that the extra backtick doesn't intefere with the closing
+    # triple backticks of a code block.
+    result += '\u2060'
+  return result
 
 def _render_content(content):
   return f'```ansi\n{content}```' if content else ''
@@ -82,15 +88,15 @@ ANSI_CLEAR = '\x1b[0m'
 def _highlight_changed_chars(before, after, *, should_return_added, color: str = ANSI_GREEN):
   desired_op = '+' if should_return_added else '-'
   res = ''
-  last_op = ' '
+  color_is_set = False
   for s in difflib.ndiff(split_on_word_boundaries(before), split_on_word_boundaries(after)):
     op = s[0]
-    if op != last_op:
-      if op == desired_op:
-        res += color
-      elif op == ' ':
-        res += ANSI_CLEAR
-      last_op = op
+    if op == desired_op and not color_is_set:
+      res += color
+      color_is_set = True
+    elif op == ' ' and color_is_set:
+      res += ANSI_CLEAR
+      color_is_set = False
     if op == desired_op or op == ' ':
       res += s[2:]
   return _render_content(res)
@@ -103,6 +109,8 @@ async def on_message_edit(before, after):
   if after.author.bot or after.is_system() or after.guild is None or after.guild.id != config['guild']:
     return
 
+  did_actually_change = False
+
   before_content = _sanitize_content(before.content)
   after_content = _sanitize_content(after.content)
 
@@ -112,6 +120,8 @@ async def on_message_edit(before, after):
   embed.add_field(name='Wiadomość:', value=after.jump_url)
 
   if before_content != after_content:
+    did_actually_change = True
+
     before_rendered = _highlight_changed_chars(before_content, after_content, should_return_added=False, color=ANSI_RED)
     if len(before_rendered) > EMBED_FIELD_LIMIT:
       files.append(discord.File(StringIO(before.content), 'Przed.txt'))
@@ -124,15 +134,21 @@ async def on_message_edit(before, after):
     else:
       embed.add_field(name='Po:', value=after_rendered, inline=False)
 
-  if before.reference != after.reference:
-    embed.add_field(name='Przywołana wiadomość przed:', value=before.reference.jump_url, inline=False)
-    embed.add_field(name='Przywołana wiadomość po:', value=after.reference.jump_url, inline=False)
+  before_ref = None if before.reference is None else before.reference.jump_url
+  after_ref = None if after.reference is None else after.reference.jump_url
+  # Comparing jump_url's is a quick way of comparing message, channel and guild IDs at the same time.
+  if before_ref != after_ref:
+    did_actually_change = True
+    embed.add_field(name='Przywołana wiadomość przed:', value=before_ref, inline=False)
+    embed.add_field(name='Przywołana wiadomość po:', value=after_ref, inline=False)
 
   if before.attachments != after.attachments:
+    did_actually_change = True
     embed.add_field(name='Załączniki przed:', value=_render_attachments(before.attachments), inline=False)
     embed.add_field(name='Załączniki po:', value=_render_attachments(after.attachments), inline=False)
 
-  await bot.get_channel(config['staff_log_channel']).send(embed=embed, files=files)
+  if did_actually_change:
+    await bot.get_channel(config['staff_log_channel']).send(embed=embed, files=files)
 
 @event_listener
 async def on_member_update(before, after):

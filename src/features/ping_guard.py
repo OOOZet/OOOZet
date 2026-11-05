@@ -91,6 +91,7 @@ async def ping_role(interaction, msg):
       if len(new_msg_content) > 2000:
         await interaction.response.send_message('Twoja wiadomość jest zbyt długa, żebym mógł coś do niej dopisać… 😔', ephemeral=True)
         return
+      # TODO: reply to the message the original message replied to
       new_msg = await msg.channel.send(
         new_msg_content,
         files=await asyncio.gather(*(i.to_file(use_cached=True) for i in msg.attachments)),
