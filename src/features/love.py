@@ -25,11 +25,14 @@ def _miau_hash(val: str):
     hash = (hash * EXP + ord(c)) % MOD
   return hash
 
+def _prepare_input(val: str):
+  return val.lower().strip()
+
 def _compute_love(a: str, b: str):
-  return (_miau_hash(a) ^ _miau_hash(b)) % 101
+  return (_miau_hash(_prepare_input(a)) ^ _miau_hash(_prepare_input(b))) % 101
 
 @app_commands.command(description='Wyświetla kompatybilność dwóch nazw')
 async def love(interaction, a: str, b: str):
   embed = discord.Embed(title=f'{a} & {b}', colour=discord.Colour.red())
-  embed.add_field(name=f'{_compute_love(a.lower(), b.lower())}%', value='')
+  embed.add_field(name='Kompatybilność:', value=f'{_compute_love(a, b)}%')
   await interaction.response.send_message(embed=embed)
